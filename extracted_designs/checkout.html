@@ -1,0 +1,293 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Checkout - Skin-Cella</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-container": "#1b261d",
+                    "on-primary-fixed-variant": "#3e4a3f",
+                    "primary-fixed-dim": "#bdcabc",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "surface-bright": "#f8faf5",
+                    "on-secondary-container": "#63635f",
+                    "outline-variant": "#c4c8c1",
+                    "tertiary": "#100d05",
+                    "on-background": "#191c1a",
+                    "surface-tint": "#556156",
+                    "on-tertiary-fixed": "#1e1b11",
+                    "surface-variant": "#e1e3df",
+                    "error": "#ba1a1a",
+                    "tertiary-container": "#262318",
+                    "surface-dim": "#d9dbd6",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f2f4f0",
+                    "on-surface": "#191c1a",
+                    "on-primary-fixed": "#131e15",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#818e82",
+                    "surface-container-high": "#e7e9e4",
+                    "surface": "#f8faf5",
+                    "inverse-primary": "#bdcabc",
+                    "inverse-on-surface": "#f0f1ed",
+                    "on-tertiary-container": "#908a7b",
+                    "surface-container-highest": "#e1e3df",
+                    "outline": "#747873",
+                    "inverse-surface": "#2e312e",
+                    "secondary-container": "#e1dfdb",
+                    "secondary-fixed": "#e4e2dd",
+                    "on-tertiary-fixed-variant": "#4b473a",
+                    "secondary-fixed-dim": "#c8c6c2",
+                    "on-surface-variant": "#434843",
+                    "on-error-container": "#93000a",
+                    "primary": "#061008",
+                    "secondary": "#5e5e5b",
+                    "background": "#f8faf5",
+                    "tertiary-fixed": "#e9e2d0",
+                    "surface-container": "#edeeea",
+                    "on-secondary-fixed": "#1b1c19",
+                    "on-secondary-fixed-variant": "#474744",
+                    "tertiary-fixed-dim": "#cdc6b5",
+                    "primary-fixed": "#d9e6d8",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "component-padding-sm": "12px",
+                    "component-padding-md": "24px",
+                    "section-gap": "120px",
+                    "margin-mobile": "20px",
+                    "gutter": "24px",
+                    "margin-desktop": "80px"
+            },
+            "fontFamily": {
+                    "headline-md": ["EB Garamond"],
+                    "display-lg": ["EB Garamond"],
+                    "body-lg": ["Manrope"],
+                    "headline-lg-mobile": ["EB Garamond"],
+                    "headline-lg": ["EB Garamond"],
+                    "body-md": ["Manrope"],
+                    "label-md": ["Manrope"]
+            },
+            "fontSize": {
+                    "headline-md": ["28px", {"lineHeight": "36px", "fontWeight": "500"}],
+                    "display-lg": ["64px", {"lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["32px", {"lineHeight": "40px", "fontWeight": "500"}],
+                    "headline-lg": ["40px", {"lineHeight": "48px", "fontWeight": "500"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Hide scrollbar for clean aesthetic but allow scrolling */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- Transactional Top Bar (Suppressed Main Nav) -->
+<header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-md border-b border-outline-variant/30 flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 transition-colors duration-300">
+<button aria-label="Go back" class="text-primary hover:opacity-70 transition-opacity flex items-center justify-center p-2 -ml-2">
+<span class="material-symbols-outlined" style="font-variation-settings: 'wght' 300;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary tracking-tight">Checkout</h1>
+<div class="w-10"></div> <!-- Spacer for center alignment -->
+</header>
+<!-- Main Content -->
+<main class="pt-[100px] pb-section-gap max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop">
+<!-- Progress Indicator -->
+<nav aria-label="Progress" class="mb-12">
+<ol class="flex items-center justify-center space-x-2 md:space-x-4" role="list">
+<li class="flex items-center">
+<span class="font-label-md text-label-md text-primary uppercase tracking-widest border-b border-primary pb-1">Shipping</span>
+</li>
+<li class="flex items-center text-outline-variant">
+<span class="material-symbols-outlined text-[16px] mx-1" style="font-variation-settings: 'wght' 300;">chevron_right</span>
+</li>
+<li class="flex items-center">
+<span class="font-label-md text-label-md text-on-surface-variant/50 uppercase tracking-widest pb-1">Payment</span>
+</li>
+<li class="flex items-center text-outline-variant">
+<span class="material-symbols-outlined text-[16px] mx-1" style="font-variation-settings: 'wght' 300;">chevron_right</span>
+</li>
+<li class="flex items-center">
+<span class="font-label-md text-label-md text-on-surface-variant/50 uppercase tracking-widest pb-1">Review</span>
+</li>
+</ol>
+</nav>
+<div class="flex flex-col lg:flex-row gap-12 lg:gap-gutter relative">
+<!-- Forms Section -->
+<div class="w-full lg:w-7/12 flex flex-col gap-12">
+<!-- Shipping Address -->
+<section>
+<h2 class="font-headline-md text-headline-md text-primary mb-6">1. Shipping Address</h2>
+<!-- Saved Address Card -->
+<div class="relative bg-surface-container-low border border-outline-variant/30 rounded p-component-padding-md mb-4 cursor-pointer transition-colors hover:bg-surface-container">
+<div class="absolute top-component-padding-md right-component-padding-md">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<p class="font-label-md text-label-md text-primary mb-1">Eleanor Vance</p>
+<p class="font-body-md text-body-md text-on-surface-variant">123 Botanical Way, Apt 4B<br>Seattle, WA 98101<br>United States</p>
+</div>
+<!-- Add New Option -->
+<button class="w-full py-4 border border-outline-variant/50 border-dashed rounded text-on-surface-variant font-label-md text-label-md uppercase tracking-widest hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                        Add New Address
+                    </button>
+</section>
+<hr class="border-outline-variant/30">
+<!-- Delivery Method -->
+<section>
+<h2 class="font-headline-md text-headline-md text-primary mb-6">2. Delivery Method</h2>
+<div class="flex flex-col gap-4">
+<!-- Standard -->
+<label class="flex items-start gap-4 p-4 border border-primary rounded cursor-pointer bg-surface-container-lowest">
+<div class="mt-1 flex-shrink-0">
+<div class="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-md text-label-md text-primary">Standard Shipping</span>
+<span class="font-label-md text-label-md text-primary">Free</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">3-5 business days. Eco-friendly packaging included.</p>
+</div>
+</label>
+<!-- Express -->
+<label class="flex items-start gap-4 p-4 border border-outline-variant/30 rounded cursor-pointer hover:border-primary/50 transition-colors">
+<div class="mt-1 flex-shrink-0">
+<div class="w-4 h-4 rounded-full border-2 border-outline-variant flex items-center justify-center"></div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-md text-label-md text-primary">Express Courier</span>
+<span class="font-label-md text-label-md text-primary">$15.00</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">1-2 business days.</p>
+</div>
+</label>
+</div>
+</section>
+<hr class="border-outline-variant/30">
+<!-- Payment Method -->
+<section>
+<h2 class="font-headline-md text-headline-md text-primary mb-6">3. Payment</h2>
+<!-- Tabs -->
+<div class="flex gap-4 mb-8 border-b border-outline-variant/30 overflow-x-auto no-scrollbar">
+<button class="pb-2 font-label-md text-label-md text-primary border-b-2 border-primary uppercase tracking-widest whitespace-nowrap">Credit Card</button>
+<button class="pb-2 font-label-md text-label-md text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest whitespace-nowrap">Apple Pay</button>
+<button class="pb-2 font-label-md text-label-md text-on-surface-variant/50 hover:text-primary transition-colors uppercase tracking-widest whitespace-nowrap">PayPal</button>
+</div>
+<!-- Card Form (Minimalist) -->
+<div class="flex flex-col gap-8">
+<div class="relative">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">Card Number</label>
+<input class="w-full bg-transparent border-0 border-b-2 border-primary/20 pb-2 px-0 focus:ring-0 focus:border-primary font-body-md text-body-md text-primary placeholder-on-surface-variant/30 transition-colors" placeholder="0000 0000 0000 0000" type="text">
+<span class="material-symbols-outlined absolute right-0 bottom-2 text-outline-variant">credit_card</span>
+</div>
+<div class="flex gap-6">
+<div class="flex-1 relative">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">Expiration</label>
+<input class="w-full bg-transparent border-0 border-b-2 border-primary/20 pb-2 px-0 focus:ring-0 focus:border-primary font-body-md text-body-md text-primary placeholder-on-surface-variant/30 transition-colors" placeholder="MM/YY" type="text">
+</div>
+<div class="flex-1 relative">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">CVC</label>
+<input class="w-full bg-transparent border-0 border-b-2 border-primary/20 pb-2 px-0 focus:ring-0 focus:border-primary font-body-md text-body-md text-primary placeholder-on-surface-variant/30 transition-colors" placeholder="123" type="text">
+</div>
+</div>
+<div class="relative">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">Name on Card</label>
+<input class="w-full bg-transparent border-0 border-b-2 border-primary/20 pb-2 px-0 focus:ring-0 focus:border-primary font-body-md text-body-md text-primary placeholder-on-surface-variant/30 transition-colors" placeholder="Name as it appears on card" type="text">
+</div>
+</div>
+</section>
+</div>
+<!-- Order Summary (Sticky Desktop) -->
+<div class="w-full lg:w-5/12">
+<div class="sticky top-[100px] bg-surface-container-low rounded p-component-padding-md md:p-8">
+<h3 class="font-headline-md text-[22px] leading-[28px] text-primary mb-6 border-b border-outline-variant/30 pb-4">Order Summary</h3>
+<!-- Items -->
+<div class="flex flex-col gap-6 mb-8">
+<div class="flex gap-4 items-center">
+<div class="w-16 h-20 bg-surface-variant rounded overflow-hidden flex-shrink-0">
+<img alt="Restorative Serum" class="w-full h-full object-cover" data-alt="A minimalist, high-end skincare serum bottle made of frosted glass with a black dropper top. The bottle rests on a textured stone surface against a soft, bright off-white background. Lighting is natural and diffused, creating a serene, apothecary aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA0veqjB-UmMLgohE3K7TQCmT3NorivJ3X6GQap2r0sPcd81UYnI-EO-ZU0jl8qvQhihWqd95BJ1T3pJuQR9h5GRxQJMIiS-HRDwTYL5z8ncq-T7RXJx3LErbE2Pp28nZNsnPFMhzHItaMzotMu2WY9oji5iNnCT90zfQIYhU_JpwVDWzZvzdF7p0gCaRiwr4WFDjFwaMzP1cNrnqO0O0T2D_xi8-2MNnwC3U7XdJ0yyy1dJ4cNCiKIR4Weo8lIqIJbX6mNBHDhp0E">
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md text-primary">Restorative Botanical Serum</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">30ml / Sage Extract</p>
+</div>
+<div class="font-body-md text-body-md text-primary text-right">
+                                $85.00
+                            </div>
+</div>
+</div>
+<div class="flex flex-col gap-3 font-body-md text-body-md text-on-surface-variant mb-6 border-t border-outline-variant/30 pt-6">
+<div class="flex justify-between">
+<span>Subtotal</span>
+<span class="text-primary">$85.00</span>
+</div>
+<div class="flex justify-between">
+<span>Shipping</span>
+<span class="text-primary">Free</span>
+</div>
+<div class="flex justify-between">
+<span>Taxes</span>
+<span class="text-primary">$7.23</span>
+</div>
+</div>
+<div class="flex justify-between items-end mb-8 border-t border-primary pt-4">
+<span class="font-label-md text-label-md uppercase tracking-widest text-primary">Total</span>
+<span class="font-headline-md text-headline-md text-primary">$92.23</span>
+</div>
+<!-- Primary Action -->
+<button class="w-full bg-primary text-on-primary font-label-md text-label-md uppercase tracking-widest py-4 rounded hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">lock</span>
+                        Complete Purchase
+                    </button>
+<!-- Trust Badges -->
+<div class="mt-6 flex justify-center gap-6">
+<div class="flex items-center gap-2 text-on-surface-variant opacity-80">
+<span class="material-symbols-outlined text-[16px]">verified_user</span>
+<span class="text-[12px] font-body-md">Secure Checkout</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant opacity-80">
+<span class="material-symbols-outlined text-[16px]">eco</span>
+<span class="text-[12px] font-body-md">Carbon Neutral</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Track Your Order - Botanical Heritage</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#cdc6b5",
+                        "primary": "#061008",
+                        "outline": "#747873",
+                        "secondary": "#5e5e5b",
+                        "primary-fixed": "#d9e6d8",
+                        "on-tertiary-fixed-variant": "#4b473a",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#474744",
+                        "on-tertiary-fixed": "#1e1b11",
+                        "surface": "#f8faf5",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f2f4f0",
+                        "on-primary-container": "#818e82",
+                        "tertiary-fixed": "#e9e2d0",
+                        "surface-tint": "#556156",
+                        "on-primary-fixed-variant": "#3e4a3f",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#e1e3df",
+                        "primary-fixed-dim": "#bdcabc",
+                        "background": "#f8faf5",
+                        "inverse-primary": "#bdcabc",
+                        "surface-container": "#edeeea",
+                        "tertiary": "#100d05",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "surface-bright": "#f8faf5",
+                        "surface-dim": "#d9dbd6",
+                        "tertiary-container": "#262318",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#2e312e",
+                        "on-background": "#191c1a",
+                        "secondary-fixed": "#e4e2dd",
+                        "secondary-container": "#e1dfdb",
+                        "primary-container": "#1b261d",
+                        "on-surface-variant": "#434843",
+                        "on-secondary-fixed": "#1b1c19",
+                        "on-tertiary-container": "#908a7b",
+                        "on-secondary-container": "#63635f",
+                        "on-surface": "#191c1a",
+                        "on-primary-fixed": "#131e15",
+                        "surface-container-highest": "#e1e3df",
+                        "surface-container-high": "#e7e9e4",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#f0f1ed",
+                        "outline-variant": "#c4c8c1",
+                        "on-secondary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "component-padding-md": "24px",
+                        "section-gap": "120px",
+                        "margin-mobile": "20px",
+                        "margin-desktop": "80px",
+                        "gutter": "24px",
+                        "component-padding-sm": "12px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["EB Garamond"],
+                        "body-lg": ["Manrope"],
+                        "headline-lg": ["EB Garamond"],
+                        "headline-md": ["EB Garamond"],
+                        "label-md": ["Manrope"],
+                        "headline-lg-mobile": ["EB Garamond"],
+                        "body-md": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-lg": ["40px", { "lineHeight": "48px", "fontWeight": "500" }],
+                        "headline-md": ["28px", { "lineHeight": "36px", "fontWeight": "500" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["32px", { "lineHeight": "40px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.surface'); color: theme('colors.on-surface'); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen flex flex-col font-body-md">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-surface text-primary dark:text-primary-fixed border-b border-outline-variant/30 flex justify-between items-center px-margin-mobile md:px-margin-desktop h-20 w-full z-50 sticky top-0">
+<button class="hover:opacity-80 transition-opacity scale-95 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<div class="font-headline-md text-headline-md tracking-widest text-primary dark:text-primary-fixed">BOTANICAL HERITAGE</div>
+<button class="hover:opacity-80 transition-opacity scale-95 active:scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined text-[24px]">shopping_bag</span>
+</button>
+</header>
+<main class="flex-grow w-full max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-12 pb-32">
+<!-- Order Header -->
+<section class="text-center mb-12">
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg mb-4 text-primary">Order #SC-8921</h1>
+<div class="inline-flex items-center px-6 py-2 rounded-full bg-primary-fixed-dim/30 border border-primary-fixed-dim">
+<span class="material-symbols-outlined mr-2 text-primary" data-weight="fill" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+<span class="font-label-md text-label-md text-primary tracking-widest uppercase">In Transit</span>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Tracking Timeline -->
+<div class="lg:col-span-7 bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/20">
+<h2 class="font-headline-md text-headline-md text-primary mb-8 border-b border-outline-variant/20 pb-4">Shipment Progress</h2>
+<div class="relative pl-6 border-l-2 border-outline-variant/30 space-y-10">
+<!-- Placed -->
+<div class="relative">
+<div class="absolute -left-[35px] top-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[14px]">check</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-primary uppercase tracking-widest">Order Placed</h3>
+<p class="font-body-md text-body-md text-secondary mt-1">Completed - Nov 12</p>
+</div>
+</div>
+<!-- Processing -->
+<div class="relative">
+<div class="absolute -left-[35px] top-1 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[14px]">check</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-primary uppercase tracking-widest">Processing</h3>
+<p class="font-body-md text-body-md text-secondary mt-1">Completed - Nov 13</p>
+</div>
+</div>
+<!-- Shipped -->
+<div class="relative">
+<div class="absolute -left-[35px] top-1 w-6 h-6 rounded-full bg-primary-container flex items-center justify-center ring-4 ring-primary-fixed/50">
+<span class="material-symbols-outlined text-white text-[14px]">local_shipping</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-primary uppercase tracking-widest">Shipped</h3>
+<p class="font-body-md text-body-md text-secondary mt-1 mb-3">Current - Nov 14</p>
+<button class="inline-flex items-center space-x-2 bg-surface-container text-primary font-label-md text-label-md px-4 py-2 rounded-full hover:bg-surface-dim transition-colors border border-outline-variant/30">
+<span class="material-symbols-outlined text-[18px]">map</span>
+<span>Track on Map</span>
+</button>
+</div>
+</div>
+<!-- Out for Delivery -->
+<div class="relative opacity-50">
+<div class="absolute -left-[35px] top-1 w-6 h-6 rounded-full bg-surface-container border-2 border-outline-variant"></div>
+<div>
+<h3 class="font-label-md text-label-md text-primary uppercase tracking-widest">Out for Delivery</h3>
+<p class="font-body-md text-body-md text-secondary mt-1">Upcoming</p>
+</div>
+</div>
+<!-- Delivered -->
+<div class="relative opacity-50">
+<div class="absolute -left-[35px] top-1 w-6 h-6 rounded-full bg-surface-container border-2 border-outline-variant"></div>
+<div>
+<h3 class="font-label-md text-label-md text-primary uppercase tracking-widest">Delivered</h3>
+<p class="font-body-md text-body-md text-secondary mt-1">Upcoming</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Details Sidebar -->
+<div class="lg:col-span-5 space-y-gutter">
+<!-- Shipment Details -->
+<div class="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/20">
+<h2 class="font-headline-md text-headline-md text-primary mb-6 border-b border-outline-variant/20 pb-4">Details</h2>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-secondary">Carrier</span>
+<span class="font-label-md text-label-md text-primary">Botanical Express</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md text-secondary">Tracking No.</span>
+<span class="font-label-md text-label-md text-primary">BN-77293041</span>
+</div>
+<div class="flex justify-between items-center pt-4 border-t border-outline-variant/10">
+<span class="font-body-md text-body-md text-secondary">Est. Delivery</span>
+<span class="font-headline-md text-headline-md text-primary text-[20px] leading-tight">Nov 16, 2024</span>
+</div>
+</div>
+</div>
+<!-- Order Summary -->
+<div class="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/20">
+<div class="flex justify-between items-center mb-6 border-b border-outline-variant/20 pb-4">
+<h2 class="font-headline-md text-headline-md text-primary">Items</h2>
+<span class="font-label-md text-label-md text-secondary bg-surface-container px-3 py-1 rounded-full">2 Items</span>
+</div>
+<div class="space-y-4">
+<!-- Item 1 -->
+<div class="flex items-center space-x-4">
+<div class="w-16 h-16 bg-surface-container rounded-lg border border-outline-variant/20 overflow-hidden shrink-0">
+<img alt="Restorative Night Cream" class="w-full h-full object-cover" data-alt="A minimalist photograph of a high-end night cream jar sitting on a stark white textured background. Soft, diffused lighting creates a serene, quiet luxury mood. The branding is subtle, aligning with an apothecary aesthetic. Colors are predominantly cream and deep muted green." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD72gOQ_8B9puKsSYTNSqzJ-reUQnBicea5FihWa_RNQuow59455GcB_I1f2RY9-nbepq-edoKS673o9I4WNwJpy5cndwJWUlskSg-oRfNV_aW4usl-huhxBkR9lRyc2Blt2JxORrGxoGmN9yfJUAoZ590x64GpCQDWVqIg93LIEjVlAqUUfNwpBeiBuZmEk4mUGCiqFsAFGN5AVK3CeBZOYjSNMX1v21WnBdQUJ9vASuIgRwpPMoih7H6QFRLz3mLO9sbGEjpwkOQ"/>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-primary">Restorative Night Cream</h4>
+<p class="font-body-md text-body-md text-secondary text-sm">50ml / 1.7oz</p>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center space-x-4 pt-4 border-t border-outline-variant/10">
+<div class="w-16 h-16 bg-surface-container rounded-lg border border-outline-variant/20 overflow-hidden shrink-0">
+<img alt="Alpine Purifying Gel" class="w-full h-full object-cover" data-alt="A clean, minimalist product shot of a sleek glass pump bottle containing an alpine purifying gel. The background is a soft, warm ivory surface. Lighting is bright and indirect, casting gentle shadows. The overall vibe is botanical organicism and modern pharmacy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAKzgy4miOph66QNhTXPdSP10PSPouA3VqAOvEtusxIT1BC4zttuVLgCPoJK_L2tHpC-0T1IX9Cpf3zWHdjVPsMimMjtj72Ty2T9iuG9WyDgZ1Iqtl70_TyZwbo2YFhoi6M_EU1YNpUmKuYfD2_DT61JtUgKeV7BDXeOGvzyecdhTpgt8UbHMrtGWfmQL1zYQ3-DXaQRnYHVGSxINHP8EE4ais0idiJtG-vQlUrVJG4ZLxleEvC61pruxbTDumnAMuO0BDy1eCwKOo"/>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-primary">Alpine Purifying Gel</h4>
+<p class="font-body-md text-body-md text-secondary text-sm">150ml / 5.1oz</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Support -->
+<div class="pt-4 flex justify-center">
+<button class="font-label-md text-label-md text-primary uppercase tracking-widest underline underline-offset-4 hover:text-primary-container transition-colors">
+                        Contact Concierge
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden bg-surface/95 dark:bg-surface/95 backdrop-blur-md border-t border-outline-variant/20 fixed bottom-0 w-full z-50 flex justify-around items-center h-20 px-4 pb-safe rounded-t-xl">
+<button class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px] mb-1">storefront</span>
+<span class="font-label-md text-[10px] uppercase tracking-widest">SHOP</span>
+</button>
+<button class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed font-bold bg-primary-fixed/50 rounded-full px-4 py-1 scale-95 transition-all duration-300 ease-in-out">
+<span class="material-symbols-outlined text-[24px] mb-1">local_shipping</span>
+<span class="font-label-md text-[10px] uppercase tracking-widest">TRACK</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px] mb-1">auto_awesome</span>
+<span class="font-label-md text-[10px] uppercase tracking-widest">RITUALS</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[24px] mb-1">person</span>
+<span class="font-label-md text-[10px] uppercase tracking-widest">PROFILE</span>
+</button>
+</nav>
+<!-- Footer for Web -->
+<footer class="hidden md:flex w-full py-section-gap px-margin-desktop flex-col md:flex-row justify-between items-center gap-gutter bg-surface-container dark:bg-surface-container-highest border-t border-outline-variant/10 text-primary dark:text-on-surface">
+<div class="font-display-lg text-display-lg text-primary text-[32px]">BOTANICAL HERITAGE</div>
+<div class="flex space-x-8 font-label-md text-label-md text-secondary">
+<a class="hover:text-primary transition-colors duration-300" href="#">SHIPPING &amp; RETURNS</a>
+<a class="hover:text-primary transition-colors duration-300" href="#">PRIVACY POLICY</a>
+<a class="hover:text-primary transition-colors duration-300" href="#">CONTACT US</a>
+</div>
+<div class="font-body-md text-body-md text-sm text-secondary">© 2024 BOTANICAL HERITAGE APOTHECARY. ALL RIGHTS RESERVED.</div>
+</footer>
+</body></html>

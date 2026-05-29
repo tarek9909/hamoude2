@@ -1,0 +1,233 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Skin-Cella | Profile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&amp;family=Manrope:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#ffffff",
+                        "surface-tint": "#556156",
+                        "on-secondary-fixed-variant": "#474744",
+                        "inverse-surface": "#2e312e",
+                        "tertiary-container": "#262318",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#edeeea",
+                        "on-tertiary-fixed": "#1e1b11",
+                        "surface-container-highest": "#e1e3df",
+                        "primary-fixed-dim": "#bdcabc",
+                        "on-surface-variant": "#434843",
+                        "tertiary-fixed-dim": "#cdc6b5",
+                        "surface-dim": "#d9dbd6",
+                        "on-secondary-container": "#63635f",
+                        "secondary-fixed": "#e4e2dd",
+                        "on-primary-fixed": "#131e15",
+                        "outline": "#747873",
+                        "on-tertiary-fixed-variant": "#4b473a",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#f0f1ed",
+                        "inverse-primary": "#bdcabc",
+                        "primary-fixed": "#d9e6d8",
+                        "on-primary-fixed-variant": "#3e4a3f",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#e9e2d0",
+                        "on-primary-container": "#818e82",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f8faf5",
+                        "surface-container-low": "#f2f4f0",
+                        "primary-container": "#1b261d",
+                        "secondary-container": "#e1dfdb",
+                        "on-primary": "#ffffff",
+                        "secondary": "#5e5e5b",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#1b1c19",
+                        "on-surface": "#191c1a",
+                        "surface-container-high": "#e7e9e4",
+                        "outline-variant": "#c4c8c1",
+                        "surface": "#f8faf5",
+                        "surface-variant": "#e1e3df",
+                        "on-background": "#191c1a",
+                        "primary": "#061008",
+                        "surface-bright": "#f8faf5",
+                        "tertiary": "#100d05",
+                        "on-tertiary-container": "#908a7b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "20px",
+                        "section-gap": "120px",
+                        "component-padding-sm": "12px",
+                        "component-padding-md": "24px",
+                        "margin-desktop": "80px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["EB Garamond"],
+                        "body-md": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "label-md": ["Manrope"],
+                        "headline-lg": ["EB Garamond"],
+                        "headline-md": ["EB Garamond"],
+                        "display-lg": ["EB Garamond"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["32px", { "lineHeight": "40px", "fontWeight": "500" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-lg": ["40px", { "lineHeight": "48px", "fontWeight": "500" }],
+                        "headline-md": ["28px", { "lineHeight": "36px", "fontWeight": "500" }],
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #f8faf5; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky z-40 bg-background dark:bg-background border-b border-outline-variant dark:border-outline-variant flex justify-between items-center px-margin-mobile h-16 max-w-[1280px] mx-auto">
+<div class="cursor-pointer active:opacity-70 text-on-surface-variant hover:text-primary-fixed-variant transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">menu</span>
+</div>
+<div class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim italic text-center flex-1">
+            Skin-Cella
+        </div>
+<div class="cursor-pointer active:opacity-70 text-on-surface-variant hover:text-primary-fixed-variant transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">shopping_bag</span>
+</div>
+</header>
+<main class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-8 space-y-16">
+<!-- Profile Header -->
+<section class="flex flex-col items-center text-center space-y-4">
+<div class="relative w-32 h-32 rounded-full overflow-hidden border border-outline-variant p-1">
+<img alt="Portrait of Elena Thorne" class="w-full h-full object-cover rounded-full" data-alt="A refined, natural portrait of a young woman with glowing skin, shot in soft, natural light indicative of high-end skincare branding. The background is a minimalist, out-of-focus soft ivory or pale sage, creating a serene, Botanical Organicism aesthetic. Her expression is calm and confident, embodying the 'quiet luxury' feel of a premium apothecary brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDZbIpKtxM1r7m-pzL2qTlrLYUUhha8_ziL3E59H152Z-K21mmuqDIn1HFZQuDE6SpSTyTViaLaiYLwRUouDxBfXgp5z5yHRdERauIQAv9pKQJMrLbO7dzsek4EYJv0BUwi9kn6hULH5RWDWHnEWhvPzpAeM4j7ZYgUOCNACO_TqAwhhQKWFSGx3LfrDpAFp4dQlkSdVzci2NI-703vhzVj71lEHTnY4hUNnCOBNX4gOp12rLSrEv1Rq3r4Dye9aMtc4C38h_iMzk">
+</div>
+<div>
+<h1 class="font-headline-lg text-headline-lg text-primary">Elena Thorne</h1>
+<p class="font-label-md text-label-md text-tertiary-container mt-1 uppercase tracking-widest flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+                    Gold Member
+                </p>
+</div>
+</section>
+<!-- My Rituals & Orders -->
+<section>
+<div class="flex justify-between items-end mb-6">
+<h2 class="font-headline-md text-headline-md text-primary border-b-2 border-primary inline-block pb-1">My Rituals &amp; Orders</h2>
+<a class="font-label-md text-label-md text-primary border-b border-primary uppercase tracking-widest hover:opacity-70 transition-opacity" href="#">View All</a>
+</div>
+<div class="flex overflow-x-auto no-scrollbar gap-6 pb-4 snap-x">
+<!-- Order Card 1 -->
+<div class="min-w-[280px] md:min-w-[320px] snap-center bg-surface-container-low border border-outline-variant rounded-lg p-6 flex flex-col justify-between hover:shadow-sm transition-shadow">
+<div>
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant">Order #SC-8921</span>
+<span class="px-2 py-1 bg-tertiary-container text-on-tertiary text-[10px] uppercase tracking-wider rounded">Delivered</span>
+</div>
+<h3 class="font-body-lg text-body-lg text-primary mb-1">Restorative Night Cream</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Qty: 1 • $120.00</p>
+</div>
+<div class="mt-6 flex gap-3">
+<button class="flex-1 border border-primary text-primary font-label-md text-label-md py-2 rounded uppercase tracking-wider hover:bg-primary-container hover:text-on-primary transition-colors">Reorder</button>
+</div>
+</div>
+<!-- Order Card 2 -->
+<div class="min-w-[280px] md:min-w-[320px] snap-center bg-surface-container-low border border-outline-variant rounded-lg p-6 flex flex-col justify-between hover:shadow-sm transition-shadow">
+<div>
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-md text-label-md text-on-surface-variant">Order #SC-9044</span>
+<span class="px-2 py-1 bg-surface-variant text-on-surface text-[10px] uppercase tracking-wider rounded border border-outline-variant">In Transit</span>
+</div>
+<h3 class="font-body-lg text-body-lg text-primary mb-1">Botanical Cleansing Oil</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Qty: 2 • $85.00</p>
+</div>
+<div class="mt-6 flex gap-3">
+<button class="flex-1 border border-primary text-primary font-label-md text-label-md py-2 rounded uppercase tracking-wider hover:bg-primary-container hover:text-on-primary transition-colors">Track</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Account & Support -->
+<section>
+<h2 class="font-headline-md text-headline-md text-primary border-b-2 border-primary inline-block pb-1 mb-6">Account &amp; Support</h2>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg divide-y divide-outline-variant">
+<a class="flex items-center justify-between p-6 hover:bg-surface-container-low transition-colors group" href="#">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 0;">face_5</span>
+<span class="font-body-lg text-body-lg text-primary">My Skin Profile</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</a>
+<a class="flex items-center justify-between p-6 hover:bg-surface-container-low transition-colors group" href="#">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 0;">receipt_long</span>
+<span class="font-body-lg text-body-lg text-primary">Order History</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</a>
+<a class="flex items-center justify-between p-6 hover:bg-surface-container-low transition-colors group" href="#">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 0;">eco</span>
+<span class="font-body-lg text-body-lg text-primary">Sustainability Impact</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</a>
+<a class="flex items-center justify-between p-6 hover:bg-surface-container-low transition-colors group" href="#">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 0;">support_agent</span>
+<span class="font-body-lg text-body-lg text-primary">Customer Support</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</a>
+<a class="flex items-center justify-between p-6 hover:bg-surface-container-low transition-colors group" href="#">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary group-hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 0;">settings</span>
+<span class="font-body-lg text-body-lg text-primary">Settings</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</a>
+</div>
+<div class="mt-8 flex justify-center">
+<button class="font-label-md text-label-md text-on-surface-variant border-b border-on-surface-variant uppercase tracking-widest hover:text-primary hover:border-primary transition-colors">Sign Out</button>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 pb-2 px-4 bg-surface-container-lowest dark:bg-surface-container-lowest border-t border-outline-variant bg-surface-container-lowest">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-all scale-95 active:scale-90 transition-transform rounded-xl p-2 w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">spa</span>
+<span class="font-label-md text-label-md text-[10px] uppercase tracking-wider">Boutique</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-all scale-95 active:scale-90 transition-transform rounded-xl p-2 w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">auto_stories</span>
+<span class="font-label-md text-label-md text-[10px] uppercase tracking-wider">Journal</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high transition-all scale-95 active:scale-90 transition-transform rounded-xl p-2 w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">self_care</span>
+<span class="font-label-md text-label-md text-[10px] uppercase tracking-wider">Wellness</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary dark:text-primary bg-secondary-container dark:bg-secondary-container rounded-full px-4 py-1 hover:bg-surface-container-high transition-all scale-95 active:scale-90 transition-transform w-16" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-label-md text-label-md text-[10px] uppercase tracking-wider">Profile</span>
+</a>
+</nav>
+</body></html>

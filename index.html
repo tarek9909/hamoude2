@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SKIN-CELLA - Premium Skincare & Beauty</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: EB Garamond & Manrope -->
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&family=Manrope:wght@200..800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#061008',       // Deep Forest Black
+              bg: '#F8FAF5',         // Soft Sage Off-White
+              container: '#1B261D',  // Velvet Jade
+              onContainer: '#818E82',// Soft Sage
+              slate: '#5E5E5B',      // Muted Warm Slate
+              gold: '#E9E2D0',       // Soft Champagne Gold
+              border: '#C4C8C1',     // Muted Linen Border
+              success: '#556156',    // Soft Leaf Green
+            }
+          },
+          fontFamily: {
+            serif: ['"EB Garamond"', 'serif'],
+            sans: ['"Manrope"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #f0f3ec;
+      font-family: 'Manrope', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #C4C8C1;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body class="flex justify-center items-center min-h-screen p-4 sm:p-8">
+
+  <!-- Premium iPhone/Device Showcase Wrapper -->
+  <div class="relative bg-black p-4 rounded-[48px] shadow-[0_25px_60px_-15px_rgba(6,16,8,0.3)] border-4 border-zinc-800 w-full max-w-[390px] h-[820px] overflow-hidden flex flex-col">
+    <!-- Speaker & Camera Notch -->
+    <div class="absolute top-0 left-1/2 transform -translate-x-1/2 h-6 w-32 bg-black rounded-b-2xl z-50 flex justify-center items-center">
+      <div class="w-12 h-1 bg-zinc-800 rounded-full mb-1.5"></div>
+    </div>
+    
+    <!-- Mobile App Container -->
+    <div id="app" class="bg-brand-bg w-full h-full rounded-[38px] overflow-hidden flex flex-col relative text-brand-dark">
+      
+      <!-- Top Status Bar Mock -->
+      <div class="h-10 px-6 pt-3 flex justify-between items-center text-xs font-semibold text-brand-dark/60 z-40 select-none">
+        <div>21:30</div>
+        <div class="flex items-center gap-1">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11.5a.5.5 0 01.5-.5h11a.5.5 0 010 1h-11a.5.5 0 01-.5-.5zm0-3a.5.5 0 01.5-.5h11a.5.5 0 010 1h-11a.5.5 0 01-.5-.5zm0-3a.5.5 0 01.5-.5h11a.5.5 0 010 1h-11a.5.5 0 01-.5-.5z"/></svg>
+          <span class="text-[10px]">5G</span>
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm14 1H4v6h12V7z"/></svg>
+        </div>
+      </div>
+
+      <!-- MAIN APP SCREENS INJECTOR -->
+      <div id="screen-container" class="flex-1 overflow-y-auto custom-scrollbar pb-20">
+        <!-- Rendered Screen will be injected here by JS -->
+      </div>
+
+      <!-- STICKY GLASSMORPHIC BOTTOM TAB NAVIGATION -->
+      <div class="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md border border-brand-border/40 rounded-2xl py-3 px-6 shadow-lg flex justify-between items-center z-40">
+        <button onclick="navigate(0)" class="tab-btn flex flex-col items-center gap-0.5 text-brand-dark" id="tab-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9s2.015-9 4.5-9y"/></svg>
+          <span class="text-[9px] font-bold tracking-wider">REGIMEN</span>
+        </button>
+        
+        <button onclick="navigate(1)" class="tab-btn flex flex-col items-center gap-0.5 text-brand-slate/60 relative" id="tab-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0z"/></svg>
+          <span class="text-[9px] font-bold tracking-wider">BAG</span>
+          <span id="cart-badge" class="absolute -top-1.5 -right-2 bg-brand-dark text-white text-[8px] font-bold px-1 rounded-full hidden">0</span>
+        </button>
+
+        <button onclick="navigate(2)" class="tab-btn flex flex-col items-center gap-0.5 text-brand-slate/60" id="tab-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0zM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+          <span class="text-[9px] font-bold tracking-wider">ME</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT ENGINE -->
+  <script>
+    // State variables
+    let currentTabIndex = 0;
+    let selectedBranch = "Botanical Heritage (Flagship)";
+    let selectedCategory = "All";
+    let selectedConcern = "All";
+    let searchQuery = "";
+    
+    // Product catalog mirroring Stitch designs
+    const products = [
+      {
+        id: "1",
+        name: "The Cellular Renewal Complex",
+        description: "An absolute crowning formula featuring concentrated Swiss Alpine Rose stem cells and multi-peptides. Instantly targets signs of aging, deep dry patches, and texture irregularities for a highly elastic, plump, and deeply hydrated skin barrier.",
+        price: 54.00,
+        imageUrl: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=600&auto=format&fit=crop",
+        category: "Serums",
+        stockQuantity: 10,
+        rating: 4.9,
+        reviewsCount: 148,
+        skinTypes: ["Sensitive", "Dry", "Mature", "Normal"],
+        ingredients: "Alpine Rose Stem Cells, Copper Tripeptide-1, Hydrolyzed Lupine Protein, Sugarcane Squalane, Centella Asiatica.",
+        volume: "50ml"
+      },
+      {
+        id: "2",
+        name: "Alpine Purifying Gel",
+        description: "A highly delicate, low-foaming facial wash infused with natural salicylic acid derived from wintergreen, green tea leaf extracts, and aloe. Melts dirt and resets oily/combination skin barriers without causing dryness.",
+        price: 32.00,
+        imageUrl: "https://images.unsplash.com/photo-1556228720-195a672e8a03?q=80&w=600&auto=format&fit=crop",
+        category: "Cleansers",
+        stockQuantity: 15,
+        rating: 4.8,
+        reviewsCount: 94,
+        skinTypes: ["Sensitive", "Combination", "Normal", "Oily"],
+        ingredients: "Wintergreen Salicylic Acid, Camellia Sinensis (Green Tea) Extract, Organic Aloe Barbadensis, Glycerin.",
+        volume: "150ml"
+      },
+      {
+        id: "3",
+        name: "Lipid Recovery Cream",
+        description: "A decadent, intensely rich barrier replenishment moisturizer with deep sugarcane ceramides, vegan cholesterol, and soothing lipids. Instantly seals cracks, hydrates skin flakes, and corrects redness.",
+        price: 48.00,
+        imageUrl: "https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?q=80&w=600&auto=format&fit=crop",
+        category: "Moisturizers",
+        stockQuantity: 12,
+        rating: 4.8,
+        reviewsCount: 78,
+        skinTypes: ["Sensitive", "Dry", "Normal"],
+        ingredients: "Ceramide NP/AP/EOP, Phytosphingosine, Shea Butter, Cold-pressed Avocado Oil, Allantoin.",
+        volume: "50ml"
+      },
+      {
+        id: "4",
+        name: "Botanical Night Oil",
+        description: "A deeply nourishing, luxurious overnight concentrate of wild organic rosehip oil, sea buckthorn extract, and vitamin C. Absorbs perfectly to restore skin glow, reduce hyperpigmentation, and firm fine lines.",
+        price: 62.00,
+        imageUrl: "https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?q=80&w=600&auto=format&fit=crop",
+        category: "Oils",
+        stockQuantity: 8,
+        rating: 4.9,
+        reviewsCount: 112,
+        skinTypes: ["Dry", "Combination", "Normal"],
+        ingredients: "Cold-Pressed Rosehip Seed Oil, Sea Buckthorn Fruit Oil, Tetrahexyldecyl Ascorbate (Vitamin C), CoQ10.",
+        volume: "30ml"
+      },
+      {
+        id: "5",
+        name: "Rosewater Tonic",
+        description: "Formulated with pure double-distilled organic rose damascena hydrosol, balancing witch hazel, and multi-molecular hyaluronic acid. Hydrates, plumps, balances pH, and readies skin for serums.",
+        price: 28.00,
+        imageUrl: "https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=600&auto=format&fit=crop",
+        category: "Toners",
+        stockQuantity: 20,
+        rating: 4.7,
+        reviewsCount: 64,
+        skinTypes: ["Sensitive", "Oily", "Normal", "Dry"],
+        ingredients: "Organic Rose Damascena Hydrosol, Witch Hazel Distillate, 2% Hyaluronic Acid Complex, Panthenol.",
+        volume: "200ml"
+      },
+      {
+        id: "6",
+        name: "Luminosity Serum",
+        description: "A super-concentrated radiance elixir packed with 10% niacinamide, 2% alpha arbutin, and botanical licorice root extract. Safely corrects stubborn hyperpigmentation, blemishes, and dark spots.",
+        price: 58.00,
+        imageUrl: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?q=80&w=600&auto=format&fit=crop",
+        category: "Serums",
+        stockQuantity: 5,
+        rating: 4.8,
+        reviewsCount: 88,
+        skinTypes: ["Dry", "Normal", "Combination", "Mature"],
+        ingredients: "10% Niacinamide, 2% Alpha Arbutin, Licorice Root Extract, Fermented Rice Ferment, Hyaluronic Acid.",
+        volume: "30ml"
+      }
+    ];
+
+    // Global Shopping Cart
+    let cart = [];
+    
+    // Global Order Logs
+    let orders = [
+      {
+        id: "SC-8921",
+        items: [
+          { product: products[0], quantity: 1 },
+          { product: products[1], quantity: 1 }
+        ],
+        subtotal: 86.00,
+        deliveryFee: 0.0,
+        discount: 0.0,
+        total: 86.00,
+        deliveryType: "Delivery",
+        status: "Processing",
+        createdAt: new Date(Date.now() - 24 * 3600 * 1000).toLocaleString(),
+        address: "485 Botanical Boulevard, Suite 12, West End"
+      }
+    ];
+
+    // Global Support Tickets
+    let tickets = [
+      {
+        id: "TC-884920",
+        category: "Product Advisory",
+        title: "Incorporating Night Oil",
+        description: "Hi! I just purchased the Botanical Night Oil and wanted to confirm if I should apply it before or after the Lipid Recovery Cream.",
+        status: "In Progress",
+        createdAt: new Date().toLocaleString(),
+        messages: [
+          { sender: "customer", content: "Hi! I just purchased the Botanical Night Oil and wanted to confirm if I should apply it before or after the Lipid Recovery Cream.", timestamp: "2 hours ago" },
+          { sender: "staff", content: "Hello Elena! Congratulations on your purchase. For dry skin, we recommend applying your Lipid Recovery Cream first to hydrate, and then patting 2-3 drops of the Botanical Night Oil on top. This seals in the moisture beautifully.", timestamp: "1 hour ago" },
+          { sender: "customer", content: "Thank you so much! That makes perfect sense.", timestamp: "30 mins ago" }
+        ]
+      }
+    ];
+
+    // Notifications
+    const notifications = [
+      { id: "1", title: "Welcome to Skin-Cella", message: "Nourish your skin barrier with our newly formulated botanical heritage complexes.", time: "1 hour ago", isRead: false },
+      { id: "2", title: "Exclusive Gold Ritual Offer", message: "Unlock a complimentary Rosewater Tonic when ordering any signature skincare bundle today.", time: "2 days ago", isRead: true }
+    ];
+
+    // Navigation Shell Switching
+    function navigate(tabIndex) {
+      currentTabIndex = tabIndex;
+      
+      // Highlight correct tab btn
+      document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+        if (idx === tabIndex) {
+          btn.classList.remove('text-brand-slate/60');
+          btn.classList.add('text-brand-dark');
+        } else {
+          btn.classList.remove('text-brand-dark');
+          btn.classList.add('text-brand-slate/60');
+        }
+      });
+
+      renderScreen();
+    }
+
+    // Main Renderer
+    function renderScreen() {
+      const container = document.getElementById('screen-container');
+      
+      if (currentTabIndex === 0) {
+        renderHomeScreen(container);
+      } else if (currentTabIndex === 1) {
+        renderCartScreen(container);
+      } else if (currentTabIndex === 2) {
+        renderProfileScreen(container);
+      }
+    }
+
+    // ==========================================
+    // 🏠 HOME SCREEN RENDERER
+    // ==========================================
+    function renderHomeScreen(container) {
+      const categories = ["All", "Cleansers", "Toners", "Serums", "Moisturizers", "Oils"];
+      const concerns = ["All", "Sensitive", "Oily", "Dry", "Combination", "Mature"];
+      
+      const filtered = products.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                              p.description.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+        const matchesConcern = selectedConcern === "All" || p.skinTypes.includes(selectedConcern);
+        return matchesSearch && matchesCategory && matchesConcern;
+      });
+
+      let html = `
+        <!-- Custom Header -->
+        <div class="px-6 py-4 flex justify-between items-start">
+          <div>
+            <h1 class="font-serif text-2xl font-bold tracking-[0.15em] text-brand-dark">SKIN-CELLA</h1>
+            <button onclick="toggleBranchSelector()" class="flex items-center gap-1 text-[10px] font-bold text-brand-slate mt-0.5">
+              <span class="w-1.5 h-1.5 bg-brand-success rounded-full"></span>
+              <span>${selectedBranch}</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+            </button>
+          </div>
+          <button onclick="openNotifications()" class="relative p-1 rounded-full border border-brand-border/40 bg-white">
+            <svg class="w-5 h-5 stroke-[1.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
+            ${notifications.some(n => !n.isRead) ? '<span class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-600 rounded-full"></span>' : ''}
+          </button>
+        </div>
+
+        <!-- Daily Wellness Tip Strip -->
+        <div class="flex gap-4 overflow-x-auto px-6 py-2 no-scrollbar">
+          <div onclick="openStory('Double Cleanse', 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=150', 'Double Cleanse Guide: Begin with a rich oil-based cleanser to lift makeup and SPF, followed by our Alpine Purifying Gel to sweep away impurities without damaging the natural skin barrier.')" class="flex flex-col items-center gap-1.5 cursor-pointer shrink-0">
+            <div class="w-14 h-14 rounded-full p-[2px] border border-brand-gold"><img src="https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=150" class="w-full h-full rounded-full object-cover"/></div>
+            <span class="text-[9px] font-bold">Double Cleanse</span>
+          </div>
+          <div onclick="openStory('SPF Guide', 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=150', 'Daily Shield: UV radiation causes 80% of skin aging. Make physical broad-spectrum protection the non-negotiable closing step of your morning skincare regimen.')" class="flex flex-col items-center gap-1.5 cursor-pointer shrink-0">
+            <div class="w-14 h-14 rounded-full p-[2px] border border-brand-gold"><img src="https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?q=80&w=150" class="w-full h-full rounded-full object-cover"/></div>
+            <span class="text-[9px] font-bold">SPF Shield</span>
+          </div>
+          <div onclick="openStory('Hydration Rule', 'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?q=80&w=150', 'Tonic Hydration: Sweep Rosewater Tonic on damp skin. Hydrated skin is significantly more permeable, allowing the Cellular Renewal Complex to sink deeper and lock in moisture.')" class="flex flex-col items-center gap-1.5 cursor-pointer shrink-0">
+            <div class="w-14 h-14 rounded-full p-[2px] border border-brand-gold"><img src="https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?q=80&w=150" class="w-full h-full rounded-full object-cover"/></div>
+            <span class="text-[9px] font-bold">Tonic Rule</span>
+          </div>
+          <div onclick="openStory('Night Routine', 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=150', 'Botanical Night: Pat 2-3 drops of Botanical Night Oil over your barrier cream at bedtime. Rich in trans-retinoic acid, it transforms skin glow and firms fine lines overnight.')" class="flex flex-col items-center gap-1.5 cursor-pointer shrink-0">
+            <div class="w-14 h-14 rounded-full p-[2px] border border-brand-gold"><img src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=150" class="w-full h-full rounded-full object-cover"/></div>
+            <span class="text-[9px] font-bold">Botanical Night</span>
+          </div>
+        </div>
+
+        <!-- Premium Botanical Hero Banner -->
+        <div class="mx-6 my-4 bg-gradient-to-br from-brand-dark to-brand-container rounded-2xl p-6 relative overflow-hidden border border-brand-border/40 shadow-sm">
+          <div class="absolute -right-6 -bottom-10 w-32 h-32 opacity-25 rounded-full overflow-hidden">
+            <img src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=300" class="object-cover w-full h-full"/>
+          </div>
+          <div class="relative z-10">
+            <span class="bg-brand-gold text-brand-dark text-[8px] font-extrabold px-2.5 py-1 rounded tracking-widest uppercase">Apothecary Collection</span>
+            <h2 class="font-serif text-xl font-bold text-brand-bg mt-3">Pure Botanical Heritage</h2>
+            <p class="text-brand-onContainer text-[10px] mt-1">Experience renewal. Automatic 15% discount active.</p>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="px-6 py-2">
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-brand-slate/60">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </span>
+            <input type="text" value="${searchQuery}" oninput="searchQuery=this.value; renderScreen()" placeholder="Search skincare ingredients, categories..." class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-brand-border rounded-full outline-none focus:border-brand-dark transition-colors"/>
+          </div>
+        </div>
+
+        <!-- Category scroll pills -->
+        <div class="px-6 mt-4">
+          <h3 class="text-[9px] font-bold tracking-wider text-brand-slate uppercase">The Apothecary Collection</h3>
+          <div class="flex gap-2 overflow-x-auto py-2 no-scrollbar">
+            ${categories.map(c => `
+              <button onclick="selectedCategory='${c}'; renderScreen()" class="px-4 py-1.5 text-xs font-semibold rounded-full border shrink-0 transition-all ${selectedCategory === c ? 'bg-brand-dark text-white border-transparent' : 'bg-white text-brand-dark border-brand-border/60'}">${c}</button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Skin concerns scroll pills -->
+        <div class="px-6 mt-2">
+          <h3 class="text-[9px] font-bold tracking-wider text-brand-slate uppercase">Designed for Skin concerns</h3>
+          <div class="flex gap-2 overflow-x-auto py-2 no-scrollbar">
+            ${concerns.map(c => `
+              <button onclick="selectedConcern='${c}'; renderScreen()" class="px-4 py-1.5 text-xs font-semibold rounded-full border shrink-0 transition-all ${selectedConcern === c ? 'bg-brand-gold text-brand-dark border-brand-dark/40' : 'bg-white text-brand-dark border-brand-border/60'}">${c}</button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Product Grid -->
+        <div class="px-6 mt-4">
+          ${filtered.length === 0 ? `
+            <div class="py-12 flex flex-col items-center justify-center text-center">
+              <svg class="w-10 h-10 text-brand-border mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.364l-.707-.707"/></svg>
+              <h4 class="font-serif text-sm font-semibold">No matching formulas found</h4>
+              <p class="text-[10px] text-brand-slate mt-1">Try resetting concerns or queries</p>
+            </div>
+          ` : `
+            <div class="grid grid-cols-2 gap-4">
+              ${filtered.map(p => `
+                <div class="bg-white border border-brand-border/80 rounded-xl overflow-hidden flex flex-col cursor-pointer" onclick="openDetails('${p.id}')">
+                  <div class="aspect-square bg-zinc-100 relative">
+                    <img src="${p.imageUrl}" class="object-cover w-full h-full"/>
+                    <span class="absolute top-2 left-2 bg-white/95 border border-brand-border/50 text-[8px] font-bold px-2 py-0.5 rounded tracking-wide uppercase">${p.category}</span>
+                    ${p.stockQuantity <= 3 ? `<span class="absolute top-2 right-2 bg-red-600 text-white text-[7px] font-bold px-1.5 py-0.5 rounded">ONLY ${p.stockQuantity} LEFT</span>` : ''}
+                  </div>
+                  <div class="p-3 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div class="flex justify-between items-center text-[10px] text-brand-slate">
+                        <span class="flex items-center gap-0.5 text-amber-500"><svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg> ${p.rating}</span>
+                        <span>${p.volume}</span>
+                      </div>
+                      <h4 class="font-serif font-bold text-xs mt-1 text-brand-dark line-clamp-2 h-[2.5em] leading-tight">${p.name}</h4>
+                    </div>
+                    <div class="flex justify-between items-center mt-2 pt-1 border-t border-zinc-50">
+                      <span class="text-xs font-extrabold text-brand-dark">${p.price.toFixed(2)}$</span>
+                      <button onclick="event.stopPropagation(); addToCart('${p.id}')" class="p-1 rounded-full bg-brand-dark text-white hover:opacity-90">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    // ==========================================
+    // 🛍️ BAG SCREEN RENDERER
+    // ==========================================
+    function renderCartScreen(container) {
+      if (cart.length === 0) {
+        container.innerHTML = `
+          <div class="px-6 py-4 border-b border-brand-border/40"><h2 class="font-serif text-lg font-bold text-center">YOUR BAG</h2></div>
+          <div class="py-32 px-12 flex flex-col items-center justify-center text-center">
+            <svg class="w-12 h-12 text-brand-border mb-4 stroke-[1.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0z"/></svg>
+            <h3 class="font-serif text-base font-bold">Your bag is empty</h3>
+            <p class="text-xs text-brand-slate mt-2 leading-relaxed">Discover our apothecary collection and add clean botanical formulas to your skincare rituals.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      const deliveryFee = subtotal >= 75.0 ? 0.0 : 10.0;
+      const discount = subtotal >= 100.0 ? subtotal * 0.15 : 0.0;
+      const total = subtotal + deliveryFee - discount;
+
+      let html = `
+        <div class="px-6 py-4 border-b border-brand-border/40 flex justify-between items-center bg-white sticky top-0 z-10">
+          <h2 class="font-serif text-lg font-bold">YOUR BAG</h2>
+          <button onclick="clearCart()" class="text-[10px] text-red-600 font-bold tracking-wider">CLEAR ALL</button>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <!-- Cart list -->
+          ${cart.map(item => `
+            <div class="bg-white p-3 rounded-xl border border-brand-border/60 flex gap-4">
+              <div class="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-zinc-50">
+                <img src="${item.product.imageUrl}" class="object-cover w-full h-full"/>
+              </div>
+              <div class="flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex justify-between items-start">
+                    <h4 class="font-serif font-bold text-xs leading-tight text-brand-dark line-clamp-1">${item.product.name}</h4>
+                    <button onclick="removeFromCart('${item.product.id}')" class="text-brand-slate hover:text-brand-dark">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                  <span class="text-[9px] text-brand-slate uppercase font-semibold mt-0.5 block">${item.product.category} • ${item.product.volume}</span>
+                </div>
+                <div class="flex justify-between items-center mt-2">
+                  <span class="text-xs font-bold text-brand-dark">${(item.product.price * item.quantity).toFixed(2)}$</span>
+                  <div class="flex items-center gap-2">
+                    <button onclick="updateQty('${item.product.id}', -1)" class="w-5 h-5 rounded-full border border-brand-border/80 flex items-center justify-center text-xs font-bold">-</button>
+                    <span class="text-xs font-bold w-4 text-center">${item.quantity}</span>
+                    <button onclick="updateQty('${item.product.id}', 1)" class="w-5 h-5 rounded-full border border-brand-border/80 flex items-center justify-center text-xs font-bold">+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+
+          <!-- Delivery threshold notice -->
+          <div class="p-3 bg-brand-success/5 border border-brand-success/20 rounded-xl flex gap-3.5 items-center mt-6">
+            <svg class="w-5 h-5 text-brand-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h8.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5h7.5"/></svg>
+            <p class="text-[10px] font-bold text-brand-success">
+              ${subtotal >= 75.0 ? 'Complimentary Home Delivery unlocked.' : `Add \$${(75.0 - subtotal).toFixed(2)} more to unlock complimentary Home Delivery.`}
+            </p>
+          </div>
+        </div>
+
+        <!-- Stitch Premium Gold checkout board -->
+        <div class="mx-6 p-5 bg-brand-gold/40 border border-brand-border/60 rounded-2xl space-y-3.5 mt-4">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-brand-slate">Subtotal</span>
+            <span class="font-bold">${subtotal.toFixed(2)}$</span>
+          </div>
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-brand-slate">Standard Shipping</span>
+            <span class="font-bold text-brand-success">${deliveryFee === 0 ? 'FREE' : deliveryFee.toFixed(2) + '$'}</span>
+          </div>
+          ${discount > 0 ? `
+            <div class="flex justify-between items-center text-xs text-brand-success">
+              <span>Spring Collection Discount (15%)</span>
+              <span class="font-bold">-${discount.toFixed(2)}$</span>
+            </div>
+          ` : ''}
+          <div class="border-t border-brand-border/40 pt-3 flex justify-between items-center">
+            <span class="font-serif text-sm font-bold text-brand-dark">Total Estimate</span>
+            <span class="text-sm font-extrabold text-brand-dark">${total.toFixed(2)}$</span>
+          </div>
+          <button onclick="openCheckout()" class="w-full bg-brand-dark text-white py-3 rounded-full text-xs font-bold mt-4 shadow-sm hover:opacity-90 transition-opacity">PROCEED TO CHECKOUT</button>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    // ==========================================
+    // 👤 ME SCREEN RENDERER
+    // ==========================================
+    function renderProfileScreen(container) {
+      let html = `
+        <div class="px-6 py-4 border-b border-brand-border/40"><h2 class="font-serif text-lg font-bold text-center">MY APOTHECARY RITUALS</h2></div>
+        
+        <div class="p-6 space-y-6">
+          <!-- Profile Card -->
+          <div class="p-4 bg-gradient-to-br from-brand-gold to-brand-bg rounded-2xl border border-brand-border/60 flex items-center gap-4">
+            <div class="w-12 h-12 bg-brand-dark rounded-full flex items-center justify-center text-white shrink-0 shadow-sm">
+              <svg class="w-6 h-6 stroke-[1.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747"/></svg>
+            </div>
+            <div>
+              <h3 class="font-serif font-bold text-sm leading-tight text-brand-dark">Elena Thorne</h3>
+              <p class="text-[10px] text-brand-slate mt-0.5">elena@thorne.com</p>
+            </div>
+          </div>
+
+          <!-- Daily Skincare Rituals Collapsible -->
+          <div>
+            <div class="flex items-center gap-2 mb-3.5">
+              <svg class="w-4.5 h-4.5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9.813 15.904L9 21l3.528-3.528"/></svg>
+              <h3 class="text-[9px] font-extrabold tracking-wider text-brand-slate uppercase">MY DAILY SKINCARE RITUALS</h3>
+            </div>
+            
+            <div class="space-y-3">
+              <!-- Morning -->
+              <div class="bg-white rounded-xl border border-brand-border/60 overflow-hidden">
+                <button onclick="toggleCollapse('morning-ritual')" class="w-full px-4 py-3 flex justify-between items-center text-left bg-zinc-50/40">
+                  <div class="flex items-center gap-3">
+                    <span class="text-amber-500"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0z"/></svg></span>
+                    <span class="font-serif font-bold text-xs">Morning Radiance Ritual</span>
+                  </div>
+                  <svg id="arrow-morning-ritual" class="w-4 h-4 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+                </button>
+                <div id="collapse-morning-ritual" class="border-t border-brand-border/40 p-1 space-y-0.5">
+                  <div class="p-3 text-[11px] font-bold border-b border-zinc-50 flex justify-between"><span>Alpine Purifying Gel</span><span class="text-brand-slate text-[9px]">Step 1: Cleanse</span></div>
+                  <div class="p-3 text-[11px] font-bold border-b border-zinc-50 flex justify-between"><span>Rosewater Tonic</span><span class="text-brand-slate text-[9px]">Step 2: Balance</span></div>
+                  <div class="p-3 text-[11px] font-bold border-b border-zinc-50 flex justify-between"><span>Luminosity Serum</span><span class="text-brand-slate text-[9px]">Step 3: Radiance</span></div>
+                  <div class="p-3 text-[11px] font-bold flex justify-between"><span>Lipid Recovery Cream</span><span class="text-brand-slate text-[9px]">Step 4: Protect</span></div>
+                </div>
+              </div>
+              
+              <!-- Evening -->
+              <div class="bg-white rounded-xl border border-brand-border/60 overflow-hidden">
+                <button onclick="toggleCollapse('evening-ritual')" class="w-full px-4 py-3 flex justify-between items-center text-left bg-zinc-50/40">
+                  <div class="flex items-center gap-3">
+                    <span class="text-brand-dark"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg></span>
+                    <span class="font-serif font-bold text-xs">Evening Cell Recovery Ritual</span>
+                  </div>
+                  <svg id="arrow-evening-ritual" class="w-4 h-4 transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+                </button>
+                <div id="collapse-evening-ritual" class="border-t border-brand-border/40 p-1 space-y-0.5 hidden">
+                  <div class="p-3 text-[11px] font-bold border-b border-zinc-50 flex justify-between"><span>Alpine Purifying Gel</span><span class="text-brand-slate text-[9px]">Step 1: Cleanse</span></div>
+                  <div class="p-3 text-[11px] font-bold border-b border-zinc-50 flex justify-between"><span>Rosewater Tonic</span><span class="text-brand-slate text-[9px]">Step 2: Hydrate</span></div>
+                  <div class="p-3 text-[11px] font-bold border-b border-zinc-50 flex justify-between"><span>Cellular Renewal Complex</span><span class="text-brand-slate text-[9px]">Step 3: Repair Elixir</span></div>
+                  <div class="p-3 text-[11px] font-bold flex justify-between"><span>Botanical Night Oil</span><span class="text-brand-slate text-[9px]">Step 4: Lipids Lock</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Shipment history logs -->
+          <div>
+            <div class="flex items-center gap-2 mb-3.5">
+              <svg class="w-4.5 h-4.5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h8.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0z"/></svg>
+              <h3 class="text-[9px] font-extrabold tracking-wider text-brand-slate uppercase">ORDER & SHIPMENT HISTORY</h3>
+            </div>
+            
+            <div class="space-y-2">
+              ${orders.map(o => `
+                <div onclick="openOrderTracking('${o.id}')" class="bg-white p-4 rounded-xl border border-brand-border/60 flex justify-between items-center cursor-pointer">
+                  <div>
+                    <h4 class="text-xs font-bold text-brand-dark">${o.id}</h4>
+                    <p class="text-[10px] text-brand-slate mt-0.5">Total: ${o.total.toFixed(2)}$ • Tap to Track</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="bg-brand-gold text-brand-dark text-[8px] font-extrabold px-2 py-0.5 rounded tracking-wide uppercase">${o.status}</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Skincare help support center -->
+          <div>
+            <div class="flex justify-between items-center mb-3.5">
+              <div class="flex items-center gap-2">
+                <svg class="w-4.5 h-4.5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <h3 class="text-[9px] font-extrabold tracking-wider text-brand-slate uppercase">APOTHECARY ASSISTANCE</h3>
+              </div>
+              <button onclick="openCreateTicket()" class="text-brand-dark bg-brand-gold p-1 rounded-full"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path d="M12 4.5v15m7.5-7.5h-15"/></svg></button>
+            </div>
+            
+            <div class="space-y-2">
+              ${tickets.length === 0 ? '<p class="text-xs text-brand-slate py-4 text-center">No active requests.</p>' : tickets.map(t => `
+                <div onclick="openTicketThread('${t.id}')" class="bg-white p-3 rounded-xl border border-brand-border/60 flex justify-between items-center cursor-pointer">
+                  <div>
+                    <h4 class="text-xs font-bold text-brand-dark truncate w-48">${t.title}</h4>
+                    <p class="text-[9px] text-brand-slate mt-0.5">${t.category} • ${t.messages.length} messages</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[8px] font-extrabold px-2 py-0.5 rounded tracking-wide uppercase ${t.status === 'Open' ? 'bg-zinc-100 text-brand-slate' : 'bg-brand-success/15 text-brand-success'}">${t.status}</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    // Toggle Collapsible routines
+    function toggleCollapse(id) {
+      const section = document.getElementById(`collapse-${id}`);
+      const arrow = document.getElementById(`arrow-${id}`);
+      if (section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+        arrow.classList.add('rotate-180');
+      } else {
+        section.classList.add('hidden');
+        arrow.classList.remove('rotate-180');
+      }
+    }
+
+    // ==========================================
+    // 🧬 PRODUCT DETAILS SCREEN MODAL
+    // ==========================================
+    function openDetails(productId) {
+      const p = products.find(prod => prod.id === productId);
+      
+      const modal = document.createElement('div');
+      modal.id = 'details-modal';
+      modal.className = 'absolute inset-0 bg-brand-bg z-50 flex flex-col overflow-y-auto custom-scrollbar';
+      
+      modal.innerHTML = `
+        <div class="relative h-[320px] bg-zinc-200">
+          <img src="${p.imageUrl}" class="object-cover w-full h-full"/>
+          <button onclick="closeDetails()" class="absolute top-6 left-6 w-9 h-9 bg-white/95 rounded-full flex items-center justify-center border border-brand-border/40"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg></button>
+        </div>
+        <div class="p-6 flex-1 flex flex-col pb-32">
+          <div class="flex justify-between items-center text-xs">
+            <span class="bg-brand-gold/60 border border-brand-border/30 text-[9px] font-bold px-2 py-0.5 rounded tracking-wide uppercase">${p.category}</span>
+            <span class="text-brand-slate">Volume: ${p.volume}</span>
+          </div>
+          <h2 class="font-serif text-2xl font-bold mt-4 leading-tight text-brand-dark">${p.name}</h2>
+          <div class="flex items-center gap-1.5 text-xs text-brand-slate mt-2">
+            <svg class="w-4 h-4 fill-current text-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            <span class="font-bold text-brand-dark">${p.rating}</span>
+            <span>(${p.reviewsCount} verified reviews)</span>
+          </div>
+          <span class="text-xl font-bold mt-4">${p.price.toFixed(2)}$</span>
+          <div class="border-t border-brand-border/40 my-4 pt-4">
+            <h3 class="text-[9px] font-bold tracking-wider text-brand-slate uppercase mb-2">DESIGNED FOR</h3>
+            <div class="flex gap-2">
+              ${p.skinTypes.map(st => `<span class="bg-white border border-brand-border text-[9px] font-bold px-2.5 py-1 rounded-md text-brand-dark">${st}</span>`).join('')}
+            </div>
+          </div>
+          <div>
+            <h3 class="text-[9px] font-bold tracking-wider text-brand-slate uppercase mb-2">THE ELIXIR</h3>
+            <p class="text-xs leading-relaxed text-brand-dark">${p.description}</p>
+          </div>
+
+          <!-- Active Ingredients Collapsible -->
+          <div class="border border-brand-border/60 rounded-xl bg-white mt-6 overflow-hidden">
+            <button onclick="toggleCollapse('ingredients')" class="w-full px-4 py-3.5 flex justify-between items-center text-left">
+              <span class="font-serif font-bold text-xs text-brand-dark">Key Active Ingredients</span>
+              <svg id="arrow-ingredients" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+            </button>
+            <div id="collapse-ingredients" class="p-4 border-t border-brand-border/40 text-[11px] text-brand-slate leading-relaxed hidden">
+              ${p.ingredients}
+            </div>
+          </div>
+
+          <!-- Application collapsible -->
+          <div class="border border-brand-border/60 rounded-xl bg-white mt-3 overflow-hidden">
+            <button onclick="toggleCollapse('ritual')" class="w-full px-4 py-3.5 flex justify-between items-center text-left">
+              <span class="font-serif font-bold text-xs text-brand-dark">Application Ritual</span>
+              <svg id="arrow-ritual" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+            </button>
+            <div id="collapse-ritual" class="p-4 border-t border-brand-border/40 text-[11px] text-brand-slate leading-relaxed hidden">
+              Warm 2-3 drops or a dime-sized amount in clean palms. Gently press onto slightly damp skin of the face, neck, and décolleté until fully absorbed. Apply morning or evening as your ritual dictates.
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Flat Bottom buy bar -->
+        <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-brand-border/80 p-4 shadow-md flex gap-4 items-center">
+          <div class="flex items-center border border-brand-border rounded-full py-1">
+            <button onclick="updateDetailsQty(-1)" class="px-3 font-bold">-</button>
+            <span id="details-qty" class="px-2 font-bold text-xs">1</span>
+            <button onclick="updateDetailsQty(1)" class="px-3 font-bold">+</button>
+          </div>
+          <button onclick="addSelectedToCart('${p.id}')" class="flex-1 bg-brand-dark text-white py-3 rounded-full text-xs font-bold shadow-sm">ADD TO BAG • <span id="details-price">${p.price.toFixed(2)}</span>$</button>
+        </div>
+      `;
+      
+      document.getElementById('app').appendChild(modal);
+    }
+
+    function closeDetails() {
+      const modal = document.getElementById('details-modal');
+      if (modal) modal.remove();
+    }
+
+    // Details Quantity management
+    let detailsQty = 1;
+    function updateDetailsQty(diff) {
+      const p = products.find(prod => prod.id === document.getElementById('details-modal').innerHTML.match(/addSelectedToCart\('(\d+)'\)/)[1]);
+      detailsQty = Math.max(1, Math.min(p.stockQuantity, detailsQty + diff));
+      document.getElementById('details-qty').innerText = detailsQty;
+      document.getElementById('details-price').innerText = (p.price * detailsQty).toFixed(2);
+    }
+
+    function addSelectedToCart(productId) {
+      const p = products.find(prod => prod.id === productId);
+      for(let i=0; i<detailsQty; i++) {
+        addToCart(productId, true); // add silently
+      }
+      detailsQty = 1;
+      closeDetails();
+      showToast(`${p.name} added to bag`);
+    }
+
+    // ==========================================
+    // 💳 CHECKOUT SCREEN MODAL
+    // ==========================================
+    function openCheckout() {
+      const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      const deliveryFee = subtotal >= 75.0 ? 0.0 : 10.0;
+      const discount = subtotal >= 100.0 ? subtotal * 0.15 : 0.0;
+      const total = subtotal + deliveryFee - discount;
+
+      const modal = document.createElement('div');
+      modal.id = 'checkout-modal';
+      modal.className = 'absolute inset-0 bg-brand-bg z-50 flex flex-col p-6 overflow-y-auto custom-scrollbar';
+      
+      modal.innerHTML = `
+        <div class="flex justify-between items-center pb-4 border-b border-brand-border/40 mb-6">
+          <button onclick="closeCheckout()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.75 19.5L8.25 12l7.5-7.5"/></svg></button>
+          <h2 class="font-serif text-base font-bold">CHECKOUT</h2>
+          <div class="w-5"></div>
+        </div>
+
+        <div class="space-y-6">
+          <!-- Summary card -->
+          <div class="bg-white p-4 rounded-xl border border-brand-border/60 flex justify-between items-center text-xs">
+            <span class="text-brand-slate">Order total (${cart.length} formulas)</span>
+            <span class="font-bold">${total.toFixed(2)}$</span>
+          </div>
+
+          <!-- Fulfillment toggle -->
+          <div class="flex gap-3">
+            <button onclick="toggleFulfillment('Delivery')" class="flex-1 py-2 text-xs font-bold rounded-full border transition-all" id="ful-delivery">Home Delivery</button>
+            <button onclick="toggleFulfillment('Pickup')" class="flex-1 py-2 text-xs font-bold rounded-full border transition-all" id="ful-pickup">Boutique Pickup</button>
+          </div>
+
+          <!-- Dynamic details -->
+          <div id="fulfillment-details" class="space-y-4"></div>
+
+          <!-- Payment inputs -->
+          <div class="space-y-3">
+            <h3 class="text-[9px] font-extrabold tracking-wider text-brand-slate uppercase">SECURE PAYMENT INFORMATION</h3>
+            
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-brand-slate/60"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975"/></svg></span>
+              <input type="text" value="Elena Thorne" class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-brand-border rounded-full" placeholder="Cardholder Name"/>
+            </div>
+
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-brand-slate/60"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75-3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg></span>
+              <input type="text" id="card-num" class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-brand-border rounded-full" placeholder="Card Number (16 Digits)"/>
+            </div>
+
+            <div class="flex gap-3">
+              <div class="relative flex-1">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-brand-slate/60"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zM14.25 15h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-2.25h.008v.008H16.5V15z"/></svg></span>
+                <input type="text" class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-brand-border rounded-full" placeholder="MM/YY"/>
+              </div>
+              <div class="relative flex-1">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-brand-slate/60"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg></span>
+                <input type="password" id="card-cvv" class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-brand-border rounded-full" placeholder="CVV"/>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="placeOrder()" class="w-full bg-brand-dark text-white py-3.5 rounded-full text-xs font-bold shadow-md hover:opacity-95 transition-opacity mt-8">PLACE ORDER • ${total.toFixed(2)}$</button>
+        </div>
+      `;
+
+      document.getElementById('app').appendChild(modal);
+      toggleFulfillment('Delivery');
+    }
+
+    function closeCheckout() {
+      const modal = document.getElementById('checkout-modal');
+      if (modal) modal.remove();
+    }
+
+    // Toggle fulfillment elements
+    let activeFulfillment = "Delivery";
+    function toggleFulfillment(type) {
+      activeFulfillment = type;
+      
+      const delBtn = document.getElementById('ful-delivery');
+      const pickBtn = document.getElementById('ful-pickup');
+      const details = document.getElementById('fulfillment-details');
+      
+      if (type === "Delivery") {
+        delBtn.className = "flex-1 py-2 text-xs font-bold rounded-full bg-brand-dark text-white border-transparent";
+        pickBtn.className = "flex-1 py-2 text-xs font-bold rounded-full bg-white text-brand-dark border-brand-border/60";
+        details.innerHTML = `
+          <h3 class="text-[9px] font-extrabold tracking-wider text-brand-slate uppercase">DELIVERY ADDRESS</h3>
+          <div class="bg-white p-3 rounded-xl border border-brand-border/60">
+            <select class="w-full text-xs bg-white outline-none">
+              <option>485 Botanical Boulevard, Suite 12, West End</option>
+              <option>92 Gardenia Heights, North Kensington</option>
+            </select>
+          </div>
+        `;
+      } else {
+        pickBtn.className = "flex-1 py-2 text-xs font-bold rounded-full bg-brand-dark text-white border-transparent";
+        delBtn.className = "flex-1 py-2 text-xs font-bold rounded-full bg-white text-brand-dark border-brand-border/60";
+        details.innerHTML = `
+          <h3 class="text-[9px] font-extrabold tracking-wider text-brand-slate uppercase">PICKUP STORE LOCATION</h3>
+          <div class="bg-white p-4 rounded-xl border border-brand-border/60 flex items-center gap-3">
+            <svg class="w-5 h-5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0h-3.75m-6.75 0h2.47a.75.75 0 0 0 .75-.75V11.25a.75.75 0 0 0-.75-.75h-3.75a.75.75 0 0 0-.75.75v8.25c0 .414.336.75.75.75zm-6-6h2.25v3.75H4.25v-3.75zm0-4.5h2.25v2.25H4.25V9zm0-4.5h2.25v2.25H4.25V4.5z"/></svg>
+            <div>
+              <h4 class="text-xs font-bold">${selectedBranch}</h4>
+              <p class="text-[10px] text-brand-slate mt-0.5">Apothecary hours: 9:00 AM - 10:00 PM</p>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Action: Place Order
+    function placeOrder() {
+      const card = document.getElementById('card-num').value.trim();
+      const cvv = document.getElementById('card-cvv').value.trim();
+      if (!card || !cvv) {
+        alert("Please complete secure payment credentials.");
+        return;
+      }
+
+      const subtotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      const deliveryFee = subtotal >= 75.0 ? 0.0 : 10.0;
+      const discount = subtotal >= 100.0 ? subtotal * 0.15 : 0.0;
+      const total = subtotal + deliveryFee - discount;
+
+      const orderId = "SC-8921"; // Matches Stitch reference
+      orders.unshift({
+        id: orderId,
+        items: [...cart],
+        subtotal,
+        deliveryFee,
+        discount,
+        total,
+        deliveryType: activeFulfillment,
+        status: "Preparing",
+        createdAt: new Date().toLocaleString(),
+        address: activeFulfillment === "Delivery" ? "485 Botanical Boulevard, Suite 12, West End" : selectedBranch
+      });
+
+      // Clear Cart
+      cart = [];
+      updateCartBadge();
+      closeCheckout();
+
+      // Show confirmation dialog
+      showOrderSuccessDialog(orderId);
+    }
+
+    // Success dialog modal
+    function showOrderSuccessDialog(orderId) {
+      const modal = document.createElement('div');
+      modal.id = 'success-modal';
+      modal.className = 'absolute inset-0 bg-black/40 z-[60] flex items-center justify-center p-6 backdrop-blur-sm';
+      modal.innerHTML = `
+        <div class="bg-brand-bg rounded-2xl p-8 w-full max-w-[320px] text-center border border-brand-border/60">
+          <div class="w-12 h-12 bg-brand-success text-white rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+          </div>
+          <h3 class="font-serif text-lg font-bold text-brand-dark">Order Confirmed!</h3>
+          <p class="text-xs text-brand-slate leading-relaxed mt-2">Your Botanical Heritage regimen has been ordered successfully. We are preparing it with care in our apothecary.</p>
+          <button onclick="closeSuccessAndTrack('${orderId}')" class="w-full bg-brand-dark text-white py-3 rounded-full text-xs font-bold mt-6 shadow-sm">TRACK REGIMEN PROGRESS</button>
+        </div>
+      `;
+      document.getElementById('app').appendChild(modal);
+    }
+
+    function closeSuccessAndTrack(orderId) {
+      document.getElementById('success-modal').remove();
+      openOrderTracking(orderId);
+    }
+
+    // ==========================================
+    // 🚚 ORDER TRACKING SCREEN MODAL
+    // ==========================================
+    function openOrderTracking(orderId) {
+      const o = orders.find(ord => ord.id === orderId);
+      
+      const modal = document.createElement('div');
+      modal.id = 'tracking-modal';
+      modal.className = 'absolute inset-0 bg-brand-bg z-50 flex flex-col p-6 overflow-y-auto custom-scrollbar';
+
+      const steps = [
+        { title: "Order Placed", desc: "We have received your botanical selection.", active: true },
+        { title: "Processing", desc: "Compounding your formulas in the apothecary.", active: true },
+        { title: "Shipped", desc: "Left the botanical boutique transit hub.", active: o.status !== "Preparing" },
+        { title: "Out for Delivery", desc: "SKIN-CELLA courier is en route.", active: false },
+        { title: "Delivered", desc: "Enjoy your fresh botanical heritage regimen.", active: false }
+      ];
+
+      modal.innerHTML = `
+        <div class="flex justify-between items-center pb-4 border-b border-brand-border/40 mb-6">
+          <button onclick="closeTracking()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.75 19.5L8.25 12l7.5-7.5"/></svg></button>
+          <h2 class="font-serif text-base font-bold">TRACK REGIMEN</h2>
+          <div class="w-5"></div>
+        </div>
+
+        <!-- Order card header -->
+        <div class="bg-brand-dark text-white p-5 rounded-2xl space-y-3 mb-6">
+          <span class="text-[9px] text-brand-onContainer font-bold uppercase tracking-wider block">Order Reference</span>
+          <div class="flex justify-between items-center">
+            <h3 class="font-serif text-xl font-bold">${o.id}</h3>
+            <span class="bg-brand-gold text-brand-dark text-[8px] font-extrabold px-2 py-0.5 rounded tracking-wide uppercase">${o.status}</span>
+          </div>
+          <div class="border-t border-white/10 pt-3 flex justify-between items-center text-xs text-white/70">
+            <span>Fulfillment: <b>${o.deliveryType}</b></span>
+            <span>Total: <b class="text-brand-gold">${o.total.toFixed(2)}$</b></span>
+          </div>
+        </div>
+
+        <h3 class="text-[9px] font-extrabold tracking-wider text-brand-slate uppercase mb-4">SHIPMENT PROGRESS</h3>
+
+        <!-- Vertical tracker line -->
+        <div class="space-y-6 pl-2 relative">
+          ${steps.map((st, idx) => `
+            <div class="flex gap-4 items-start relative">
+              <div class="flex flex-col items-center">
+                <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center z-10 ${st.active ? 'bg-brand-success border-brand-success text-white' : 'bg-white border-brand-border text-brand-border'}">
+                  ${st.active ? '<svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>' : ''}
+                </div>
+                ${idx < steps.length - 1 ? `<div class="w-0.5 h-12 ${st.active ? 'bg-brand-success' : 'bg-brand-border/60'}"></div>` : ''}
+              </div>
+              <div>
+                <h4 class="font-serif font-bold text-sm ${st.active ? 'text-brand-dark' : 'text-brand-slate'}">${st.title}</h4>
+                <p class="text-[10px] text-brand-slate leading-relaxed mt-0.5">${st.desc}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      document.getElementById('app').appendChild(modal);
+    }
+
+    function closeTracking() {
+      const modal = document.getElementById('tracking-modal');
+      if (modal) {
+        modal.remove();
+        navigate(2); // Redirect back to Profile tab
+      }
+    }
+
+    // ==========================================
+    // 💬 ACTIVE TICKET CHAT THREAD MODAL
+    // ==========================================
+    function openTicketThread(ticketId) {
+      const t = tickets.find(tick => tick.id === ticketId);
+      
+      const modal = document.createElement('div');
+      modal.id = 'ticket-modal';
+      modal.className = 'absolute inset-0 bg-brand-bg z-50 flex flex-col overflow-hidden';
+      
+      modal.innerHTML = `
+        <div class="px-6 py-4 border-b border-brand-border/40 bg-white flex justify-between items-center shrink-0">
+          <button onclick="closeTicket()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.75 19.5L8.25 12l7.5-7.5"/></svg></button>
+          <h2 class="font-serif text-sm font-bold truncate w-40">${t.title}</h2>
+          <div class="w-5"></div>
+        </div>
+
+        <div class="px-6 py-2 bg-zinc-50 border-b border-brand-border/30 flex justify-between items-center text-[10px] shrink-0 text-brand-slate">
+          <span>Case: <b>${t.id}</b></span>
+          <span>Category: <b>${t.category}</b></span>
+        </div>
+
+        <!-- Chat messages stream -->
+        <div id="chat-stream" class="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-4">
+          ${t.messages.map(m => `
+            <div class="flex flex-col ${m.sender === 'customer' ? 'items-end' : 'items-start'}">
+              <div class="p-3 rounded-2xl max-w-[80%] text-xs leading-relaxed ${m.sender === 'customer' ? 'bg-brand-dark text-white rounded-br-none' : 'bg-white border border-brand-border/60 text-brand-dark rounded-bl-none'}">
+                <span class="text-[8px] font-bold block mb-1 opacity-70">${m.sender === 'customer' ? 'Elena Thorne' : 'Apothecary Expert'}</span>
+                ${m.content}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Input composer -->
+        <div class="p-4 bg-white border-t border-brand-border/80 flex gap-2 items-center shrink-0">
+          <input type="text" id="chat-input" class="flex-1 border border-brand-border rounded-full px-4 py-2 text-xs outline-none focus:border-brand-dark" placeholder="Type your message to the Skincare Advisor..."/>
+          <button onclick="sendChatMessage('${t.id}')" class="p-2.5 rounded-full bg-brand-dark text-white"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M3.4 20.4l17.4-8.4L3.4 3.6v6.6l12.6 1.8-12.6 1.8v6.6z"/></svg></button>
+        </div>
+      `;
+
+      document.getElementById('app').appendChild(modal);
+      setTimeout(() => {
+        const stream = document.getElementById('chat-stream');
+        stream.scrollTop = stream.scrollHeight;
+      }, 50);
+    }
+
+    function closeTicket() {
+      const modal = document.getElementById('ticket-modal');
+      if (modal) modal.remove();
+    }
+
+    function sendChatMessage(ticketId) {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const t = tickets.find(tick => tick.id === ticketId);
+      t.messages.push({
+        sender: "customer",
+        content: text,
+        timestamp: "Just now"
+      });
+      input.value = "";
+
+      // Re-render chat
+      const stream = document.getElementById('chat-stream');
+      const div = document.createElement('div');
+      div.className = "flex flex-col items-end";
+      div.innerHTML = `
+        <div class="p-3 rounded-2xl max-w-[80%] text-xs leading-relaxed bg-brand-dark text-white rounded-br-none">
+          <span class="text-[8px] font-bold block mb-1 opacity-70">Elena Thorne</span>
+          ${text}
+        </div>
+      `;
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
+
+      // Mock helpful Expert response
+      setTimeout(() => {
+        const reply = "Thank you for the details. We are processing your request. Please let us know if there's anything else you would like to add.";
+        t.messages.push({
+          sender: "staff",
+          content: reply,
+          timestamp: "Just now"
+        });
+        
+        const replyDiv = document.createElement('div');
+        replyDiv.className = "flex flex-col items-start";
+        replyDiv.innerHTML = `
+          <div class="p-3 rounded-2xl max-w-[80%] text-xs leading-relaxed bg-white border border-brand-border/60 text-brand-dark rounded-bl-none">
+            <span class="text-[8px] font-bold block mb-1 opacity-70">Apothecary Expert</span>
+            ${reply}
+          </div>
+        `;
+        stream.appendChild(replyDiv);
+        stream.scrollTop = stream.scrollHeight;
+      }, 1500);
+    }
+
+    // ==========================================
+    // ➕ HELP CENTER / CREATE TICKET SCREEN
+    // ==========================================
+    function openCreateTicket() {
+      const modal = document.createElement('div');
+      modal.id = 'create-ticket-modal';
+      modal.className = 'absolute inset-0 bg-brand-bg z-50 flex flex-col p-6 overflow-y-auto custom-scrollbar';
+      
+      modal.innerHTML = `
+        <div class="flex justify-between items-center pb-4 border-b border-brand-border/40 mb-6">
+          <button onclick="closeCreateTicket()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.75 19.5L8.25 12l7.5-7.5"/></svg></button>
+          <h2 class="font-serif text-base font-bold">File Skincare Ticket</h2>
+          <div class="w-5"></div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="text-[10px] font-extrabold text-brand-slate uppercase block mb-1.5">Request Category</label>
+            <div class="bg-white p-3 rounded-xl border border-brand-border/60">
+              <select id="t-cat" class="w-full text-xs bg-white outline-none">
+                <option>Product Advisory</option>
+                <option>Product Issue</option>
+                <option>Fulfillment Case</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[10px] font-extrabold text-brand-slate uppercase block mb-1.5">Ticket Title</label>
+            <input type="text" id="t-title" class="w-full px-4 py-2.5 text-xs bg-white border border-brand-border rounded-full" placeholder="e.g. Irritation advisory question"/>
+          </div>
+
+          <div>
+            <label class="text-[10px] font-extrabold text-brand-slate uppercase block mb-1.5">Question / Description</label>
+            <textarea id="t-desc" rows="4" class="w-full px-4 py-3 text-xs bg-white border border-brand-border rounded-2xl outline-none focus:border-brand-dark" placeholder="Describe your skin concerns or request..."></textarea>
+          </div>
+
+          <button onclick="submitTicket()" class="w-full bg-brand-dark text-white py-3.5 rounded-full text-xs font-bold shadow-md hover:opacity-95 transition-opacity mt-8">SUBMIT REQUEST</button>
+        </div>
+      `;
+
+      document.getElementById('app').appendChild(modal);
+    }
+
+    function closeCreateTicket() {
+      const modal = document.getElementById('create-ticket-modal');
+      if (modal) modal.remove();
+    }
+
+    function submitTicket() {
+      const category = document.getElementById('t-cat').value;
+      const title = document.getElementById('t-title').value.trim();
+      const description = document.getElementById('t-desc').value.trim();
+
+      if (!title || !description) {
+        alert("Please fill out all fields.");
+        return;
+      }
+
+      tickets.unshift({
+        id: "TC-" + Math.floor(Math.random() * 900000 + 100000),
+        category,
+        title,
+        description,
+        status: "Open",
+        createdAt: new Date().toLocaleString(),
+        messages: [
+          { sender: "customer", content: description, timestamp: "Just now" },
+          { sender: "staff", content: `Hello! We have received your request regarding '${category}'. A skincare advisor is looking into this and will assist you shortly.`, timestamp: "Just now" }
+        ]
+      });
+
+      closeCreateTicket();
+      navigate(2); // Reload profile tab
+      showToast("Support ticket filed successfully");
+    }
+
+    // ==========================================
+    // 🔔 NOTIFICATIONS MODAL
+    // ==========================================
+    function openNotifications() {
+      const modal = document.createElement('div');
+      modal.id = 'notif-modal';
+      modal.className = 'absolute inset-0 bg-brand-bg z-50 flex flex-col p-6 overflow-y-auto custom-scrollbar';
+      
+      modal.innerHTML = `
+        <div class="flex justify-between items-center pb-4 border-b border-brand-border/40 mb-6">
+          <button onclick="closeNotifications()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.75 19.5L8.25 12l7.5-7.5"/></svg></button>
+          <h2 class="font-serif text-base font-bold">Notifications</h2>
+          <button onclick="markAllNotifRead()" class="text-[9px] text-brand-dark font-extrabold tracking-wider">MARK ALL READ</button>
+        </div>
+
+        <div class="space-y-3">
+          ${notifications.map(n => `
+            <div class="p-3 bg-white border border-brand-border/60 rounded-xl flex gap-3 relative ${n.isRead ? '' : 'bg-brand-success/5 border-brand-success/20'}">
+              <div class="w-2.5 h-2.5 bg-brand-dark rounded-full shrink-0 mt-1 ${n.isRead ? 'hidden' : ''}"></div>
+              <div class="flex-1">
+                <div class="flex justify-between items-start">
+                  <h4 class="text-xs font-bold text-brand-dark">${n.title}</h4>
+                  <span class="text-[8px] text-brand-slate font-bold shrink-0">${n.time}</span>
+                </div>
+                <p class="text-[10px] text-brand-slate leading-relaxed mt-1">${n.message}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      document.getElementById('app').appendChild(modal);
+    }
+
+    function closeNotifications() {
+      const modal = document.getElementById('notif-modal');
+      if (modal) modal.remove();
+      renderScreen();
+    }
+
+    function markAllNotifRead() {
+      notifications.forEach(n => n.isRead = true);
+      closeNotifications();
+    }
+
+    // ==========================================
+    // 🏢 BRANCH SELECTOR MODAL
+    // ==========================================
+    function toggleBranchSelector() {
+      const branches = [
+        "Botanical Heritage (Flagship)",
+        "Elena Thorne Rituals Boutique",
+        "Uptown Organics Apothecary"
+      ];
+
+      const modal = document.createElement('div');
+      modal.id = 'branch-modal';
+      modal.className = 'absolute inset-0 bg-black/40 z-50 flex items-end justify-center backdrop-blur-[2px]';
+      modal.innerHTML = `
+        <div class="bg-white rounded-t-3xl p-6 w-full max-w-[390px] space-y-4 border-t border-brand-border/60 pb-10">
+          <div class="flex justify-between items-center">
+            <h3 class="font-serif text-base font-bold">Select Boutique Branch</h3>
+            <button onclick="closeBranchSelector()"><svg class="w-5 h-5 text-brand-slate" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+          </div>
+          <p class="text-[10px] text-brand-slate leading-normal">Skincare routine collections vary slightly depending on branch locations.</p>
+          <div class="space-y-2 mt-2">
+            ${branches.map(b => `
+              <div onclick="selectBranch('${b}')" class="p-3 bg-brand-bg border rounded-xl flex justify-between items-center cursor-pointer transition-colors ${selectedBranch === b ? 'border-brand-dark bg-zinc-50 font-bold' : 'border-brand-border/40'}">
+                <span class="text-xs">${b}</span>
+                ${selectedBranch === b ? '<svg class="w-4.5 h-4.5 text-brand-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5"/></svg>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      document.getElementById('app').appendChild(modal);
+    }
+
+    function closeBranchSelector() {
+      const modal = document.getElementById('branch-modal');
+      if (modal) modal.remove();
+    }
+
+    function selectBranch(branch) {
+      selectedBranch = branch;
+      closeBranchSelector();
+      renderScreen();
+    }
+
+    // ==========================================
+    // 📖 DAILY WELLNESS STORY MODAL
+    // ==========================================
+    function openStory(title, image, tip) {
+      const modal = document.createElement('div');
+      modal.id = 'story-modal';
+      modal.className = 'absolute inset-0 bg-black/40 z-50 flex items-center justify-center p-6 backdrop-blur-sm';
+      modal.innerHTML = `
+        <div class="bg-brand-bg rounded-2xl overflow-hidden w-full max-w-[320px] border border-brand-border/60">
+          <div class="h-44 bg-zinc-200">
+            <img src="${image}" class="object-cover w-full h-full"/>
+          </div>
+          <div class="p-6 text-center space-y-3">
+            <h3 class="font-serif text-lg font-bold">${title}</h3>
+            <p class="text-xs text-brand-dark leading-relaxed">${tip}</p>
+            <button onclick="closeStory()" class="w-full bg-brand-dark text-white py-2.5 rounded-full text-xs font-bold mt-4 shadow-sm">GOT IT</button>
+          </div>
+        </div>
+      `;
+      document.getElementById('app').appendChild(modal);
+    }
+
+    function closeStory() {
+      const modal = document.getElementById('story-modal');
+      if (modal) modal.remove();
+    }
+
+    // ==========================================
+    // 🔔 UTILITIES & CORE CART ACTIONS
+    // ==========================================
+    function addToCart(productId, silent = false) {
+      const p = products.find(prod => prod.id === productId);
+      const existing = cart.find(item => item.product.id === productId);
+      
+      if (existing) {
+        if (existing.quantity < p.stockQuantity) {
+          existing.quantity++;
+        } else {
+          alert(`Only ${p.stockQuantity} items in stock.`);
+          return;
+        }
+      } else {
+        cart.push({ product: p, quantity: 1 });
+      }
+
+      updateCartBadge();
+      if (!silent) {
+        showToast(`${p.name} added to bag`);
+      }
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(item => item.product.id !== productId);
+      updateCartBadge();
+      renderScreen();
+    }
+
+    function updateQty(productId, diff) {
+      const item = cart.find(i => i.product.id === productId);
+      if (item) {
+        const nextQty = item.quantity + diff;
+        if (nextQty <= 0) {
+          removeFromCart(productId);
+        } else if (nextQty <= item.product.stockQuantity) {
+          item.quantity = nextQty;
+          updateCartBadge();
+          renderScreen();
+        } else {
+          alert(`Only ${item.product.stockQuantity} items in stock.`);
+        }
+      }
+    }
+
+    function clearCart() {
+      cart = [];
+      updateCartBadge();
+      renderScreen();
+    }
+
+    function updateCartBadge() {
+      const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+      const badge = document.getElementById('cart-badge');
+      if (count > 0) {
+        badge.innerText = count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // Dynamic Toast Notification with bag redirect
+    function showToast(message) {
+      // Remove any existing toast
+      const oldToast = document.getElementById('toast');
+      if (oldToast) oldToast.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.className = 'absolute top-16 left-4 right-4 bg-brand-dark/95 backdrop-blur-sm text-white px-5 py-3.5 rounded-xl shadow-lg border border-white/10 flex justify-between items-center z-50 animate-bounce';
+      
+      toast.innerHTML = `
+        <span class="text-[11px] font-bold truncate w-48">${message}</span>
+        <button onclick="closeToastAndGoToBag()" class="text-brand-gold text-[10px] font-extrabold tracking-wider hover:opacity-90 shrink-0">VIEW BAG</button>
+      `;
+
+      document.getElementById('app').appendChild(toast);
+      
+      // Auto dismiss after 3 seconds
+      setTimeout(() => {
+        const t = document.getElementById('toast');
+        if (t) t.remove();
+      }, 3000);
+    }
+
+    function closeToastAndGoToBag() {
+      const t = document.getElementById('toast');
+      if (t) t.remove();
+      navigate(1); // Switch to Bag tab
+    }
+
+    // Bootstrap app
+    navigate(0);
+  </script>
+</body>
+</html>

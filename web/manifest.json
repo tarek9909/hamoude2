@@ -1,0 +1,9 @@
+{
+  "name": "Storefront Template",
+  "short_name": "Storefront",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F8FAF5",
+  "theme_color": "#061008",
+  "description": "Universal customer storefront template driven by store slug configuration."
+}

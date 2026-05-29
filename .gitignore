@@ -1,0 +1,65 @@
+# Dependency directories
+/node_modules/
+/.dart_tool/
+/.packages
+/.flutter-plugins
+/.flutter-plugins-dependencies
+/.pub-cache/
+/.pub/
+/build/
+
+# IDEs and Editors
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.history/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+tomb.db
+
+# Android Specific
+/android/app/local.properties
+/android/app/key.properties
+/android/app/shared_prefs/
+/android/app/src/main/assets/
+*.keystore
+*.jks
+
+# iOS Specific
+/ios/Flutter/Flutter.podspec
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/ios/Flutter/App.framework
+/ios/Flutter/Flutter.framework
+/ios/Flutter/CocoaPods.podspec
+/ios/Pods/
+/ios/.symlinks/
+
+# Web Specific
+/web/assets/
+
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local Environment variables
+.env
+.env.*
+*.env
+*.env.*

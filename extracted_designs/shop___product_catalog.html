@@ -1,0 +1,294 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Skin-Cella | Product Catalog</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&amp;family=Manrope:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-fixed": "#131e15",
+                      "on-primary": "#ffffff",
+                      "on-secondary-container": "#63635f",
+                      "tertiary-container": "#262318",
+                      "tertiary": "#100d05",
+                      "primary": "#061008",
+                      "surface-dim": "#d9dbd6",
+                      "on-secondary-fixed-variant": "#474744",
+                      "secondary": "#5e5e5b",
+                      "primary-fixed-dim": "#bdcabc",
+                      "inverse-surface": "#2e312e",
+                      "on-tertiary-fixed-variant": "#4b473a",
+                      "on-secondary-fixed": "#1b1c19",
+                      "surface-container-highest": "#e1e3df",
+                      "surface-bright": "#f8faf5",
+                      "primary-container": "#1b261d",
+                      "on-surface-variant": "#434843",
+                      "on-error-container": "#93000a",
+                      "surface-container-high": "#e7e9e4",
+                      "secondary-fixed": "#e4e2dd",
+                      "on-tertiary": "#ffffff",
+                      "inverse-primary": "#bdcabc",
+                      "surface-variant": "#e1e3df",
+                      "background": "#f8faf5",
+                      "surface-container-low": "#f2f4f0",
+                      "on-tertiary-container": "#908a7b",
+                      "on-surface": "#191c1a",
+                      "primary-fixed": "#d9e6d8",
+                      "on-primary-fixed-variant": "#3e4a3f",
+                      "surface-container": "#edeeea",
+                      "on-primary-container": "#818e82",
+                      "surface-tint": "#556156",
+                      "secondary-container": "#e1dfdb",
+                      "outline": "#747873",
+                      "tertiary-fixed-dim": "#cdc6b5",
+                      "tertiary-fixed": "#e9e2d0",
+                      "surface": "#f8faf5",
+                      "outline-variant": "#c4c8c1",
+                      "on-background": "#191c1a",
+                      "secondary-fixed-dim": "#c8c6c2",
+                      "surface-container-lowest": "#ffffff",
+                      "on-tertiary-fixed": "#1e1b11",
+                      "error-container": "#ffdad6",
+                      "inverse-on-surface": "#f0f1ed",
+                      "error": "#ba1a1a",
+                      "on-error": "#ffffff",
+                      "on-secondary": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin-mobile": "20px",
+                      "component-padding-sm": "12px",
+                      "gutter": "24px",
+                      "margin-desktop": "80px",
+                      "section-gap": "120px",
+                      "component-padding-md": "24px"
+              },
+              "fontFamily": {
+                      "headline-md": [
+                              "EB Garamond"
+                      ],
+                      "headline-lg": [
+                              "EB Garamond"
+                      ],
+                      "display-lg": [
+                              "EB Garamond"
+                      ],
+                      "body-md": [
+                              "Manrope"
+                      ],
+                      "body-lg": [
+                              "Manrope"
+                      ],
+                      "headline-lg-mobile": [
+                              "EB Garamond"
+                      ],
+                      "label-md": [
+                              "Manrope"
+                      ]
+              },
+              "fontSize": {
+                      "headline-md": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "40px",
+                              {
+                                      "lineHeight": "48px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "64px",
+                              {
+                                      "lineHeight": "72px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24
+        }
+      </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="sticky top-0 w-full z-50 bg-background/80 backdrop-blur-md flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 w-full">
+<button aria-label="Menu" class="hover:opacity-70 transition-opacity active:scale-95 transition-transform duration-200 text-secondary dark:text-secondary-fixed-dim">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim tracking-tight">Skin-Cella</h1>
+<button aria-label="Search" class="hover:opacity-70 transition-opacity active:scale-95 transition-transform duration-200 text-secondary dark:text-secondary-fixed-dim">
+<span class="material-symbols-outlined">search</span>
+</button>
+</header>
+<main class="flex-grow pt-8 pb-section-gap px-margin-mobile md:px-margin-desktop max-w-[1280px] mx-auto w-full">
+<!-- Page Header & Filters -->
+<div class="flex flex-col items-center mb-16 space-y-8">
+<div class="text-center space-y-4">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary">The Apothecary Collection</h2>
+<p class="font-body-lg text-body-lg text-secondary max-w-2xl mx-auto">Discover our meticulously curated range of botanical formulations, designed to restore balance and vitality to your skin.</p>
+</div>
+<!-- Filter Chips -->
+<div class="flex flex-wrap justify-center gap-3 w-full">
+<button class="px-4 py-2 rounded-full border border-primary text-primary bg-primary/5 font-label-md text-label-md transition-colors">All</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-secondary hover:border-primary hover:text-primary hover:bg-primary/5 font-label-md text-label-md transition-colors">Cleansers</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-secondary hover:border-primary hover:text-primary hover:bg-primary/5 font-label-md text-label-md transition-colors">Serums</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-secondary hover:border-primary hover:text-primary hover:bg-primary/5 font-label-md text-label-md transition-colors">Oils</button>
+<button class="px-4 py-2 rounded-full border border-outline-variant text-secondary hover:border-primary hover:text-primary hover:bg-primary/5 font-label-md text-label-md transition-colors">Moisturizers</button>
+</div>
+</div>
+<!-- Product Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-gutter gap-y-16">
+<!-- Product Card 1 -->
+<div class="group flex flex-col cursor-pointer">
+<div class="relative w-full aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden flex items-center justify-center">
+<img alt="Alpine Purifying Gel" class="w-[80%] h-[80%] object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-700 ease-in-out" data-alt="A minimalist, high-end product shot of a frosted glass pump bottle containing a pale green gel cleanser. The bottle sits on a pristine, soft ivory background. The lighting is diffused, bright, and natural, creating a serene, apothecary aesthetic with subtle, soft shadows. Botanical organicism style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiNLRB9E7PGlw5INHsu8aHWnLU02z4r0d0XAVVQ-qsuPIDx6rJsej-xANwVgPbt96NPesA9OsHipm_8MzTD7Giz_eYaXnqORTo4bcx395B03fH3ncj7NzRZLhxfGxm4fW-yNxdC87jZt40XV1_tjPBvGpHF4mI12iqOZizmlk3z4cDGaa0hXcBf15YTKYkNvtITyT4VUg5RJMS6MJ6OmVf4VW_B-VX7sY7nf_iCKVcgdQy3lrV5gyBQiJEKJM5Jelb3aGQBRR80pw">
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="px-2 py-1 bg-tertiary-fixed/80 text-tertiary font-label-md text-[10px] uppercase tracking-wider rounded-sm backdrop-blur-sm">Vegan</span>
+</div>
+</div>
+<div class="text-center flex flex-col flex-grow">
+<h3 class="font-headline-md text-[20px] text-primary mb-1">Alpine Purifying Gel</h3>
+<p class="font-body-md text-body-md text-secondary mb-3 flex-grow">Gentle Daily Exfoliation</p>
+<p class="font-label-md text-label-md text-primary">$48</p>
+</div>
+</div>
+<!-- Product Card 2 -->
+<div class="group flex flex-col cursor-pointer">
+<div class="relative w-full aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden flex items-center justify-center">
+<img alt="Lipid Recovery Cream" class="w-[80%] h-[80%] object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-700 ease-in-out" data-alt="A premium, minimalist studio shot of a heavy white ceramic jar of face cream resting on a subtle cream-colored plinth. The background is a soft, muted off-white. Lighting is soft and directional, highlighting the rich texture of the cream and the elegant curves of the packaging. Quiet luxury aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAf5FwwU4B2ubRdAvb-2yomVMfkVFv7TmOYChgL5eQyQmAn6ne895TG9MZ0VR24_KxKVPdKj_POSbrHVReehY5iVOhZyPv7NowgsZMedHiU5RA09mUQT8ov3OyF3YeW2A6YHm2j0qw4AqXsN7GuGq-PxO4LnM9sajFyx6zZo3VAwJV1uq4OBSCJMycORDAbK-v7Prt4c8VJSrp1QWwixOUnP2dos7gWVhJwGsrh9-dbUyI8vEbxyQcrUkSaPLyGTIA5igH6sQTe4Lg">
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="px-2 py-1 bg-tertiary-fixed/80 text-tertiary font-label-md text-[10px] uppercase tracking-wider rounded-sm backdrop-blur-sm">Best Seller</span>
+</div>
+</div>
+<div class="text-center flex flex-col flex-grow">
+<h3 class="font-headline-md text-[20px] text-primary mb-1">Lipid Recovery Cream</h3>
+<p class="font-body-md text-body-md text-secondary mb-3 flex-grow">Deep Barrier Support</p>
+<p class="font-label-md text-label-md text-primary">$85</p>
+</div>
+</div>
+<!-- Product Card 3 -->
+<div class="group flex flex-col cursor-pointer">
+<div class="relative w-full aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden flex items-center justify-center">
+<img alt="Botanical Night Oil" class="w-[80%] h-[80%] object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-700 ease-in-out" data-alt="An elegant amber glass dropper bottle filled with a golden facial oil. It is positioned on a smooth, pale sage green surface with a softly blurred background. A single, delicate botanical shadow falls across the scene, creating a sense of natural tranquility and premium skincare editorial style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJi1byKJNB1Td_1Hn6tBfwgIhwNVB1dTR3oJNq4moNCyLxIefLLb2kXxx0qx8ZMRB-9qFt_CN6UmQoT8UHo5IP2mzLLkpMrYUUz3O1P56Syd5kKLwAJz25TBBCVeDErneMHF340OhV48ERVkjyQbc2ud-BSRTcbb_Ri5a3o3WB4EuhhWbkcekcLbzVVVieQcwjTCiJn4qjBnp-TzsWnMtXPcAgdF0rRjc9ZKSMdJQX1UAhXyacfYB7foep4MicZnD1hFmd6Q9KS8U">
+</div>
+<div class="text-center flex flex-col flex-grow">
+<h3 class="font-headline-md text-[20px] text-primary mb-1">Botanical Night Oil</h3>
+<p class="font-body-md text-body-md text-secondary mb-3 flex-grow">Cellular Renewal</p>
+<p class="font-label-md text-label-md text-primary">$110</p>
+</div>
+</div>
+<!-- Product Card 4 -->
+<div class="group flex flex-col cursor-pointer">
+<div class="relative w-full aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden flex items-center justify-center">
+<img alt="Rosewater Tonic" class="w-[80%] h-[80%] object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-700 ease-in-out" data-alt="A tall, minimalist frosted bottle of rosewater toner standing against a clean, bright white background. The liquid inside has a very faint, elegant pink hue. The lighting is crisp and even, reflecting a modern, minimalist pharmacy aesthetic with a focus on purity and simplicity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDe1yKRcE0rcOnmLBqQdtJfnKkXm5AtQD5suCfx7wXqRKGGs9vlvdo6xkpC0LzFbzUeBWzSxAtOQ6YsT9tY4YypapdowcwyQDN3ya2OmmgA01kRAbg7Jt5dvklX74Jp1AcuLBEC2K4XQy_DSRqyEae4hgmbbxTNroBHTy8yvHpHh3UmObUrsoWI0MWYEGQ5TuyQA0C9zftY1lEkXjA8fdK2y8sqQ5FegCT1JQmEjVN5Q5bnSmcLAZJZoYaSoH1Mr8n07s6CXlrvUww">
+</div>
+<div class="text-center flex flex-col flex-grow">
+<h3 class="font-headline-md text-[20px] text-primary mb-1">Rosewater Tonic</h3>
+<p class="font-body-md text-body-md text-secondary mb-3 flex-grow">Hydrating Prep Step</p>
+<p class="font-label-md text-label-md text-primary">$42</p>
+</div>
+</div>
+<!-- Product Card 5 -->
+<div class="group flex flex-col cursor-pointer">
+<div class="relative w-full aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden flex items-center justify-center">
+<img alt="Vitamin C Serum" class="w-[80%] h-[80%] object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-700 ease-in-out" data-alt="A sleek, opaque white serum bottle with a minimalist label, placed on a textured, light stone surface. The background is a soft, warm cream color. The lighting is bright and clean, emphasizing the smooth, high-quality finish of the packaging in a modern apothecary style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBivHNBbTBxeNiPiQP1iSYou2Oz_bgirS6nnUsXhwNiZ7m3aowmNAKnCYFTOXd5Y_LzuJnzRJ-khyuVAHx5b-C5BTCpObQzZJzkQ1F6IR_R-ePLqzt5cUGpg-ludP_tywW8VDbo_rOPsIp-cpmrjMTSPORcE_s_pYHHzaKVUfeRW0bjcyzsttonOCo1W2xi70zJYudc6ZmZMVfSzjOHjk6laDH2LxbgtkT_p288ZT8yrXngoVN1uJsHiGbGPoc8l_L50I_dSKntJF0">
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="px-2 py-1 bg-tertiary-fixed/80 text-tertiary font-label-md text-[10px] uppercase tracking-wider rounded-sm backdrop-blur-sm">New</span>
+</div>
+</div>
+<div class="text-center flex flex-col flex-grow">
+<h3 class="font-headline-md text-[20px] text-primary mb-1">Luminosity Serum</h3>
+<p class="font-body-md text-body-md text-secondary mb-3 flex-grow">15% Vitamin C Complex</p>
+<p class="font-label-md text-label-md text-primary">$95</p>
+</div>
+</div>
+<!-- Product Card 6 -->
+<div class="group flex flex-col cursor-pointer">
+<div class="relative w-full aspect-[4/5] bg-surface-container-low mb-6 overflow-hidden flex items-center justify-center">
+<img alt="Clay Mask" class="w-[80%] h-[80%] object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-700 ease-in-out" data-alt="A modern, dark green tub of clay face mask slightly open, revealing a smooth, earthy grey-green texture inside. It rests on an off-white background with a hint of natural, dappled sunlight filtering through, creating a calm, botanical luxury vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCE_lIhyBChl3zjtAWnUmDA5iBmsCzrTPsCXlzwzUzJJVavzezl1dSSYNa2tMnwmncyNmoofJrirRdNk7EwHaHp7pODN7mjkIt3oPzpQOoxZZw3zIKQ1vjVarKLiBW0I0GuSwh-V4I7_sx2pdG84trEnjiDQfQ8AH2DRN4pv37VHYMjwhcBzWvywzybrOSYl8bFRlT3rmhD1wWFDsGXUbNKgXB1MijgIHF5BoPtXDXlXHItE13FboySWT3kOsYXYP63xnoxQ5EskwA" style="object-fit: cover;">
+</div>
+<div class="text-center flex flex-col flex-grow">
+<h3 class="font-headline-md text-[20px] text-primary mb-1">Mineral Detox Mask</h3>
+<p class="font-body-md text-body-md text-secondary mb-3 flex-grow">Weekly Pore Clarifying</p>
+<p class="font-label-md text-label-md text-primary">$55</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 bg-background dark:bg-background border-t border-outline-variant/10 fixed bottom-0 left-0 w-full flex justify-around items-center pt-2 pb-safe px-4 pb-4">
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary transition-colors">home_app_logo</span>
+<span class="font-label-md text-[10px] uppercase tracking-wider group-hover:text-primary transition-colors">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim font-bold hover:text-primary dark:hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">local_mall</span>
+<span class="font-label-md text-[10px] uppercase tracking-wider">Shop</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary transition-colors">shopping_bag</span>
+<span class="font-label-md text-[10px] uppercase tracking-wider group-hover:text-primary transition-colors">Bag</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors active:scale-90 transition-transform duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary transition-colors">person</span>
+<span class="font-label-md text-[10px] uppercase tracking-wider group-hover:text-primary transition-colors">Account</span>
+</a>
+</nav>
+</body></html>

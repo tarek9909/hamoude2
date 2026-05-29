@@ -1,0 +1,394 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>SKIN-CELLA - Home</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-high": "#e7e9e4",
+                        "error-container": "#ffdad6",
+                        "surface-container": "#edeeea",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "on-secondary-fixed-variant": "#474744",
+                        "inverse-primary": "#bdcabc",
+                        "outline": "#747873",
+                        "on-secondary": "#ffffff",
+                        "surface-bright": "#f8faf5",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#061008",
+                        "secondary-container": "#e1dfdb",
+                        "primary-fixed-dim": "#bdcabc",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed": "#131e15",
+                        "surface": "#f8faf5",
+                        "primary-fixed": "#d9e6d8",
+                        "error": "#ba1a1a",
+                        "inverse-on-surface": "#f0f1ed",
+                        "on-primary-container": "#818e82",
+                        "on-secondary-fixed": "#1b1c19",
+                        "background": "#f8faf5",
+                        "secondary": "#5e5e5b",
+                        "surface-container-highest": "#e1e3df",
+                        "primary-container": "#1b261d",
+                        "tertiary-fixed-dim": "#cdc6b5",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#4b473a",
+                        "tertiary-fixed": "#e9e2d0",
+                        "outline-variant": "#c4c8c1",
+                        "on-surface-variant": "#434843",
+                        "inverse-surface": "#2e312e",
+                        "surface-tint": "#556156",
+                        "on-background": "#191c1a",
+                        "tertiary-container": "#262318",
+                        "surface-dim": "#d9dbd6",
+                        "on-error-container": "#93000a",
+                        "surface-variant": "#e1e3df",
+                        "on-tertiary-fixed": "#1e1b11",
+                        "tertiary": "#100d05",
+                        "secondary-fixed": "#e4e2dd",
+                        "on-tertiary-container": "#908a7b",
+                        "on-secondary-container": "#63635f",
+                        "on-surface": "#191c1a",
+                        "on-primary-fixed-variant": "#3e4a3f",
+                        "surface-container-low": "#f2f4f0",
+                        "on-primary": "#ffffff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "margin-desktop": "80px",
+                        "component-padding-sm": "12px",
+                        "gutter": "24px",
+                        "component-padding-md": "24px",
+                        "section-gap": "120px",
+                        "margin-mobile": "20px"
+                    },
+                    fontFamily: {
+                        "label-md": ["Manrope"],
+                        "headline-md": ["EB Garamond"],
+                        "headline-lg": ["EB Garamond"],
+                        "body-lg": ["Manrope"],
+                        "headline-lg-mobile": ["EB Garamond"],
+                        "display-lg": ["EB Garamond"],
+                        "body-md": ["Manrope"]
+                    },
+                    fontSize: {
+                        "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.05em", fontWeight: "600" }],
+                        "headline-md": ["28px", { lineHeight: "36px", fontWeight: "500" }],
+                        "headline-lg": ["40px", { lineHeight: "48px", fontWeight: "500" }],
+                        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "headline-lg-mobile": ["32px", { lineHeight: "40px", fontWeight: "500" }],
+                        "display-lg": ["64px", { lineHeight: "72px", letterSpacing: "-0.02em", fontWeight: "500" }],
+                        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom scrollbar for horizontal lists to maintain clean aesthetic */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Carousel specific styles */
+        .carousel-container {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        .carousel-slide {
+            scroll-snap-align: start;
+            flex: 0 0 100%;
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased pb-24 md:pb-0">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky bg-surface/90 backdrop-blur-md dark:bg-surface-dim border-b border-outline-variant dark:border-outline z-40">
+<div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 w-full max-w-[1280px] mx-auto">
+<button class="text-on-surface-variant hover:opacity-80 transition-opacity cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md tracking-widest text-primary dark:text-primary-fixed uppercase">SKIN-CELLA</h1>
+<button class="text-on-surface-variant hover:opacity-80 transition-opacity cursor-pointer active:scale-95">
+<span class="material-symbols-outlined">search</span>
+</button>
+</div>
+</header>
+<main class="max-w-[1280px] mx-auto w-full">
+<!-- Hero Carousel -->
+<section class="relative w-full aspect-[4/5] md:aspect-[21/9] bg-surface-container-high overflow-hidden group">
+<div class="carousel-container w-full h-full hide-scrollbar relative">
+<!-- Slide 1 -->
+<div class="carousel-slide relative h-full w-full shrink-0">
+<img alt="Botanical Heritage Collection" class="absolute inset-0 w-full h-full object-cover" data-alt="A luxurious lifestyle shot of a woman with glowing skin, surrounded by lush botanical elements in a naturally lit, minimal environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5rnvY5Ye4DU2KAdjlVrCitsfA9S8xTkzIRYQSA2DvUp-qGn4bw9D7lJ_OAE0NFiVtSZ4mh6aSXHRXSHIC-zYJNADb01dk6QRbctkAt0gMCDyjRgiYf7pG81bOd2NftoYdc-B3xKMDE0Mt_otfvXsgVdBBYRkINDR5LRDZl2lanKVBEZEDvj6cGLsK4vbkltdifsVCHgNW7amNH4Umz-uPi_3S35D_dtO8paGpTHRCPcMwhOjUbNH5KKJiK9z1zgn1trrIlhSdNU0">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-high/90 via-surface-container-high/40 to-transparent"></div>
+<div class="absolute bottom-0 left-0 w-full p-8 md:p-16 flex flex-col items-start gap-4">
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-md text-label-md uppercase tracking-widest backdrop-blur-md">Botanical Heritage</span>
+<h2 class="font-display-lg text-[40px] md:text-display-lg leading-tight text-primary">Rooted in<br>Nature</h2>
+<button class="mt-4 bg-primary text-on-primary font-label-md text-label-md px-8 py-3 rounded-full hover:bg-on-primary-fixed-variant transition-colors uppercase tracking-widest">Shop Collection</button>
+</div>
+</div>
+<!-- Slide 2 -->
+<div class="carousel-slide relative h-full w-full shrink-0">
+<img alt="Clinical Efficacy" class="absolute inset-0 w-full h-full object-cover" data-alt="A clean, scientific shot of serums and beakers in a pristine laboratory setting, emphasizing the rigorous science behind the brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCof83VxK6gKsPKhNBLR9z_IDMUEPaHXqFbp9Qxofex9QnIMh1-T6IYykQflqPA3lr8XF1eVusWftcqTmRdFf0R35l1khgRRsqQKT8fJG2SJdc1pdTpBrd0r-QqYMxdbI81hIJe7BRzVBNh2k3drmuHCebBA9WPeHvk89PrX7Th1ZNgTVO8YQIBKzPdxva-vyAXznf_YlXPa1S97LjAU2xiprns89a4hBtSrBgCNNrrTkKoLcWKY0uoR-MfetLFFoUFRrZL-P2sCx8">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-high/90 via-surface-container-high/40 to-transparent"></div>
+<div class="absolute bottom-0 left-0 w-full p-8 md:p-16 flex flex-col items-start gap-4">
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-md text-label-md uppercase tracking-widest backdrop-blur-md">Science Backed</span>
+<h2 class="font-display-lg text-[40px] md:text-display-lg leading-tight text-primary">Clinical<br>Precision</h2>
+<button class="mt-4 bg-primary text-on-primary font-label-md text-label-md px-8 py-3 rounded-full hover:bg-on-primary-fixed-variant transition-colors uppercase tracking-widest">Learn More</button>
+</div>
+</div>
+</div>
+<!-- Carousel Indicators (Visual only) -->
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+<div class="w-16 h-1 rounded-full bg-primary"></div>
+<div class="w-16 h-1 rounded-full bg-primary/30"></div>
+</div>
+</section>
+<!-- Story Bubbles (Discovery) -->
+<section class="py-10 px-margin-mobile md:px-margin-desktop bg-surface-container-low/50 border-y border-surface-variant">
+<div class="flex justify-center overflow-x-auto hide-scrollbar gap-8 snap-x snap-mandatory pb-2"><!-- Story 1 -->
+<div class="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer group">
+<div class="w-24 h-24 rounded-full border-2 border-primary/20 group-hover:border-primary p-[3px] transition-all duration-300 ring-offset-2 ring-1 ring-transparent group-hover:ring-primary/10">
+<img alt="Sourcing" class="w-full h-full rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuzRJWvAIkx6sHxyrPlV03m8xE5mPXMuPNVDXmMLu1W7hbMnFyFI8lewl0AUpbTGO8tljaA27VqFT3EZHYbDJlzq0zZUwLRgH9b2BFvAuITrKVhUX6hW1JbPPb9NHEdl0dsxNLzpT2luXZ3dzbghptGe5YB6AfoqjICTfnfe6n0W4DhTsr7ll6MQh0ixldY5st0GBp6z0jIISlUiB6PVjWA7cdGC6JtdPEJhHpToPfey3FiVl_OMzWrdnb_XPOgOHqlVQTXLFeL_o">
+</div>
+<span class="font-label-md text-[12px] text-primary uppercase tracking-[0.2em] font-bold">Sourcing</span>
+</div>
+<!-- Story 2 -->
+<div class="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer group">
+<div class="w-24 h-24 rounded-full border-2 border-primary/20 group-hover:border-primary p-[3px] transition-all duration-300 ring-offset-2 ring-1 ring-transparent group-hover:ring-primary/10">
+<img alt="Efficacy" class="w-full h-full rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCof83VxK6gKsPKhNBLR9z_IDMUEPaHXqFbp9Qxofex9QnIMh1-T6IYykQflqPA3lr8XF1eVusWftcqTmRdFf0R35l1khgRRsqQKT8fJG2SJdc1pdTpBrd0r-QqYMxdbI81hIJe7BRzVBNh2k3drmuHCebBA9WPeHvk89PrX7Th1ZNgTVO8YQIBKzPdxva-vyAXznf_YlXPa1S97LjAU2xiprns89a4hBtSrBgCNNrrTkKoLcWKY0uoR-MfetLFFoUFRrZL-P2sCx8">
+</div>
+<span class="font-label-md text-[12px] text-primary uppercase tracking-[0.2em] font-bold">Efficacy</span>
+</div>
+<!-- Story 3 -->
+<div class="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer group">
+<div class="w-24 h-24 rounded-full border-2 border-primary/20 group-hover:border-primary p-[3px] transition-all duration-300 ring-offset-2 ring-1 ring-transparent group-hover:ring-primary/10">
+<img alt="Textures" class="w-full h-full rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFEF0U14MmDRgyuUDqWZZ1RILzjTBo-kopY9ltj4oD6hn68nMgBJFS0B_SP98PV2Xb05bwz_5ifz9bpnoouVtoHKFgw0OagB1OwKmxaMjaHPE50nxKw6hDSdwZCmzHy_RPhCCmQHAqV2DKVRRVH1zlkLnS7yNC5WDXDERZpYopG06vEMFuIQftmA0UlzrzASTeYgga9Lvqmx09z_FmmMn7RBltV5ez1oSVKr8Mk1tN1V7qPp9RJtRzlXWOc5q4RngWov-kJ79RHWU">
+</div>
+<span class="font-label-md text-[12px] text-primary uppercase tracking-[0.2em] font-bold">Textures</span>
+</div>
+<!-- Story 4 -->
+<div class="flex flex-col items-center gap-3 shrink-0 snap-start cursor-pointer group">
+<div class="w-24 h-24 rounded-full border-2 border-primary/20 group-hover:border-primary p-[3px] transition-all duration-300 ring-offset-2 ring-1 ring-transparent group-hover:ring-primary/10">
+<img alt="Rituals" class="w-full h-full rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5rnvY5Ye4DU2KAdjlVrCitsfA9S8xTkzIRYQSA2DvUp-qGn4bw9D7lJ_OAE0NFiVtSZ4mh6aSXHRXSHIC-zYJNADb01dk6QRbctkAt0gMCDyjRgiYf7pG81bOd2NftoYdc-B3xKMDE0Mt_otfvXsgVdBBYRkINDR5LRDZl2lanKVBEZEDvj6cGLsK4vbkltdifsVCHgNW7amNH4Umz-uPi_3S35D_dtO8paGpTHRCPcMwhOjUbNH5KKJiK9z1zgn1trrIlhSdNU0">
+</div>
+<span class="font-label-md text-[12px] text-primary uppercase tracking-[0.2em] font-bold">Rituals</span>
+</div></div>
+</section>
+<!-- Special Offers List -->
+<section class="py-12 border-b border-surface-variant bg-surface-container-lowest">
+<div class="px-margin-mobile md:px-margin-desktop mb-8">
+<h3 class="font-headline-md text-headline-md text-primary">Bundles</h3>
+<p class="font-body-md text-on-surface-variant"></p>
+</div>
+<div class="px-margin-mobile md:px-margin-desktop flex flex-col gap-6"><div class="px-margin-mobile md:px-margin-desktop flex flex-col gap-12 md:gap-20">
+<!-- Bundle 1 -->
+<div class="group relative flex flex-col md:flex-row gap-8 md:items-center bg-surface-container-low rounded-xl p-6 md:p-12 hover:shadow-lg transition-shadow duration-500">
+<div class="w-full md:w-1/2 aspect-square md:aspect-[4/5] rounded-xl overflow-hidden">
+<img alt="The Glow Essentials" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRSBnTEktWBgsYtUWyGvFoB_MgKPm38y474UfuSpGZ_CTHeglCJ_A__-ZPiXtPfM2pagaQLKUdsEYYqqNFSx2lCHPsY4BzU7I-nxSqbsnTb8WlWHA1F5uN7ObYbhx9wr_2Dv2SlPub39VpGIFkBEE0tQmFlnVZdSyAyDQeRWnG6Q_DUVRs2N0yEJX-4acouRGXr4JZU5wA6FW7rGoNF234PpqTD-fhd1wtfk9Ge9ZKdVKs2DD-GqkX6ahjG-RTQETYBck_9ikZaak">
+</div>
+<div class="w-full md:w-1/2 flex flex-col items-start gap-4">
+<span class="font-label-md text-label-md text-on-surface-variant tracking-[0.2em] uppercase">Signature Collection</span>
+<h4 class="font-headline-lg text-headline-lg text-primary tracking-wide">The Glow Essentials</h4>
+<p class="font-body-lg text-on-surface-variant max-w-md">Our signature 3-step ritual meticulously crafted to deliver radiant, deeply hydrated skin through Alpine botanicals.</p>
+<div class="flex items-baseline gap-4 mt-2">
+<span class="font-headline-md text-primary font-medium">$120</span>
+<span class="font-body-md text-on-surface-variant line-through opacity-40">$148</span>
+</div>
+<button class="mt-4 group/btn flex items-center gap-2 border-b border-primary pb-1 font-label-md text-label-md tracking-widest text-primary uppercase hover:opacity-70 transition-all">
+                Explore Bundle
+                <span class="material-symbols-outlined text-[18px] group-hover/btn:translate-x-1 transition-transform">arrow_right_alt</span>
+</button>
+</div>
+</div>
+<!-- Bundle 2 -->
+<div class="group relative flex flex-col md:flex-row-reverse gap-8 md:items-center bg-surface-container-low rounded-xl p-6 md:p-12 hover:shadow-lg transition-shadow duration-500">
+<div class="w-full md:w-1/2 aspect-square md:aspect-[4/5] rounded-xl overflow-hidden">
+<img alt="Post-Sun Ritual" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQdQF4jk-0KewJ8TY8JJ6DET886kqEceJTBbchuoMureg3ZxexLohwmY18zFCpqfWvCZqqf7NHSqwGkgmLDkxIYVBrdbYPcl9APMdsw9tfLAsU1VjSzHkTTnqv9gXz1t82p79VWN56iofsmpQ4LftUkwpoK_rSIhzZjIbFByfo6NKu8RtUYv-I7ZWTTLE3ObRsS_WU-mjmL8q2Ab0MbzCQiQlmqXVrGa1vL-pHUaUaH7yIMhoM2s4naPL6c1ZvZGcil94uGtTXsfw">
+</div>
+<div class="w-full md:w-1/2 flex flex-col items-start gap-4">
+<span class="font-label-md text-label-md text-on-surface-variant tracking-[0.2em] uppercase">Seasonal Recovery</span>
+<h4 class="font-headline-lg text-headline-lg text-primary tracking-wide">Post-Sun Ritual</h4>
+<p class="font-body-lg text-on-surface-variant max-w-md">A soothing recovery system designed to restore and calm sun-exposed skin using pure mountain plant extracts.</p>
+<div class="flex items-baseline gap-4 mt-2">
+<span class="font-headline-md text-primary font-medium">$85</span>
+<span class="font-body-md text-on-surface-variant line-through opacity-40">$105</span>
+</div>
+<button class="mt-4 group/btn flex items-center gap-2 border-b border-primary pb-1 font-label-md text-label-md tracking-widest text-primary uppercase hover:opacity-70 transition-all">
+                View Ritual
+                <span class="material-symbols-outlined text-[18px] group-hover/btn:translate-x-1 transition-transform">arrow_right_alt</span>
+</button>
+</div>
+</div>
+</div></div>
+</section>
+<!-- Shop Categories / Brands Previews -->
+<section class="px-margin-mobile md:px-margin-desktop py-12 border-b border-surface-variant flex flex-col gap-12">
+<!-- Shop by Brand -->
+<div>
+<div class="flex justify-between items-end mb-6">
+<h3 class="font-headline-md text-headline-md text-primary">Shop by Brand</h3>
+<a class="font-label-md text-label-md text-secondary underline underline-offset-4 hover:text-primary transition-colors" href="#">View All</a>
+</div>
+<div class="flex overflow-x-auto hide-scrollbar gap-6 snap-x pb-2">
+<!-- Brand Card 1 -->
+<div class="shrink-0 snap-start w-40 flex flex-col gap-3 items-center group cursor-pointer">
+<div class="w-full aspect-square rounded-full bg-surface-container flex items-center justify-center p-6 overflow-hidden border border-outline-variant group-hover:border-primary transition-colors">
+<img alt="Brand" class="w-full h-full object-contain grayscale group-hover:grayscale-0 transition-all duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDzRfNhoiwyc8W5jDCS-VOQ1kfvtGCEJhOVNjt07WLB2BVwriF1DZlgApGs5qJcNuRcvUmjx6um94L0WpFhAgc-ip_Y8JZPOHAKp-2HM2aX-S7mtMmUUneXNCLfNnT_iwfjmc-lgZ2N1qcvCCvomvHwTZlw4GzoG_B0fhgJt7QHB9fciqV4ICxRniJsgflEyCIBLytddGzKs4_WpiPllTg-C7NO5WAo6uYyoZ1Wd7s7nKxDFMGom16xNPwPbaIJZfzdFDl-sn0Df4">
+</div>
+<span class="font-label-md text-label-md text-primary text-center tracking-widest uppercase">Le Labo</span>
+</div>
+<!-- Brand Card 2 -->
+<div class="shrink-0 snap-start w-40 flex flex-col gap-3 items-center group cursor-pointer">
+<div class="w-full aspect-square rounded-full bg-surface-container flex items-center justify-center p-6 overflow-hidden border border-outline-variant group-hover:border-primary transition-colors">
+<img alt="Brand" class="w-full h-full object-contain grayscale group-hover:grayscale-0 transition-all duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7WtyZuKWOllqcQqXe9n45e-4tvpS-mbj11ECW1sHETrlFnGCX_cLujD_WwWWdVa3AMKMpzqFYaxF5nySncqlxTBz299Ger1cSS0_-VsDTsk6p2FGZkqK2d-MbNKqi9t390nv9WXw5hiBINGPbQv_VvgiD6XbpW_LN9PU_UbzWL3u1SqM9tDuVfIchckp6GzbkWWa-UYY-UC_R_FHxCW3k7Zr8owlXRYO5qkYQvgzWQu-tM93d6CGFEtmKW4YD8FwZsw22DiJdKuM">
+</div>
+<span class="font-label-md text-label-md text-primary text-center tracking-widest uppercase">Aesop</span>
+</div>
+<!-- Brand Card 3 -->
+<div class="shrink-0 snap-start w-40 flex flex-col gap-3 items-center group cursor-pointer">
+<div class="w-full aspect-square rounded-full bg-surface-container flex items-center justify-center p-6 overflow-hidden border border-outline-variant group-hover:border-primary transition-colors">
+<img alt="Brand" class="w-full h-full object-contain grayscale group-hover:grayscale-0 transition-all duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGpdDdacjfmSL7304eCN-G4OC-Yh31vo3Ax_yoV2nZRp2K9s6JCKEPLtSDSfQn9hnVEu-Sb5hhc7OvPDrowGvy1lDaDDDZMiMOQ8FOQ9hL1T2WdM9Sgm_hMQI6DbD8adKZc5FG-Wm7ZvcnrZD_kgrGn2jJ4XWa0FvDNVEbQUrGh0hWddn1qSTF5gSH_fJtkiTfMifhgRr3dJ57g-pLkRKTF5TJSvpibIndV2avQZPk9b18D1D1mUmJMTmb1CQYYOSQmgicMrBqPuk">
+</div>
+<span class="font-label-md text-label-md text-primary text-center tracking-widest uppercase">Byredo</span>
+</div>
+</div>
+</div>
+<!-- Shop by Category -->
+<div>
+<div class="flex justify-between items-end mb-6">
+<h3 class="font-headline-md text-headline-md text-primary">Shop by Category</h3>
+<a class="font-label-md text-label-md text-secondary underline underline-offset-4 hover:text-primary transition-colors" href="#">View All</a>
+</div>
+<div class="flex overflow-x-auto hide-scrollbar gap-6 snap-x pb-2">
+<!-- Category Card 1 -->
+<div class="shrink-0 snap-start w-48 flex flex-col gap-4 group cursor-pointer">
+<div class="w-full aspect-[4/5] rounded-xl bg-surface-container overflow-hidden">
+<img alt="Cleansers" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRSBnTEktWBgsYtUWyGvFoB_MgKPm38y474UfuSpGZ_CTHeglCJ_A__-ZPiXtPfM2pagaQLKUdsEYYqqNFSx2lCHPsY4BzU7I-nxSqbsnTb8WlWHA1F5uN7ObYbhx9wr_2Dv2SlPub39VpGIFkBEE0tQmFlnVZdSyAyDQeRWnG6Q_DUVRs2N0yEJX-4acouRGXr4JZU5wA6FW7rGoNF234PpqTD-fhd1wtfk9Ge9ZKdVKs2DD-GqkX6ahjG-RTQETYBck_9ikZaak">
+</div>
+<span class="font-headline-md text-[20px] text-primary">Cleansers</span>
+</div>
+<!-- Category Card 2 -->
+<div class="shrink-0 snap-start w-48 flex flex-col gap-4 group cursor-pointer">
+<div class="w-full aspect-[4/5] rounded-xl bg-surface-container overflow-hidden">
+<img alt="Serums" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXZeGEYt5ApeDViXERMl7n-Llz_oss2MfAfFPhxzCVD5s_-D0WONDhotNV7WNb1-k6_PLyzgS92I4_fUFja__rtxH8kimO22PROIEojkBx6qoXZMO_Zc0Bv67oB7Myi-Vsv4-viTdbFmz3MKIfiDxfMnEPHTDt3edJxAVaGH0g5tR-BoZkmHHouVch3Ic0kTZq986zDrSwB5neJXNEPCkfssIJHUgX_QIIicW91iYoSc4WWePldC4v0xEIwwLKR-0Y7_p2a89heug">
+</div>
+<span class="font-headline-md text-[20px] text-primary">Serums</span>
+</div>
+<!-- Category Card 3 -->
+<div class="shrink-0 snap-start w-48 flex flex-col gap-4 group cursor-pointer">
+<div class="w-full aspect-[4/5] rounded-xl bg-surface-container overflow-hidden">
+<img alt="Moisturizers" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFshV6TBUl3zJyO3VfRanFGkX6BTKKyMS6F7YPvyCVxcdHNvpwE1qSNLRmY_YJteOTVqJ004gv72e0qNPsXj9ESjjL4Ktl3xmCmqaYY51QkvmsftPVMjz5MBrFnYqVhhW4xSrBj-BCC7Zxry9ToKn_-0reWTMkfKcZKnT-OtcdH_9tTkVraDo0xXbiOWYAykdSzNAdQTi2oLupwGX1JenOu29voytCvt9QVCdGCQdLwfgjyrOJ1GD3zkJdQ7rEMlcyYyNdli5S8jk">
+</div>
+<span class="font-headline-md text-[20px] text-primary">Moisturizers</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Special Offers Carousel -->
+<section class="mb-section-gap mt-16">
+<div class="px-margin-mobile md:px-margin-desktop mb-10 flex flex-col items-center md:items-start text-center md:text-left gap-2 border-b border-surface-variant pb-6">
+<h3 class="font-display-lg text-display-lg text-primary">Weekly Deals</h3>
+<p class="font-body-md text-on-surface-variant">Exclusive botanical essentials for your seasonal ritual.</p>
+</div>
+<div class="px-margin-mobile md:px-margin-desktop">
+<div class="flex overflow-x-auto hide-scrollbar gap-6 snap-x pb-8">
+<!-- Deal 1 -->
+<div class="shrink-0 snap-start w-[280px] md:w-[320px] flex flex-col gap-4 group">
+<div class="aspect-[3/4] bg-surface-container rounded-xl overflow-hidden relative">
+<span class="absolute top-4 left-4 bg-primary text-on-primary font-label-md text-[10px] px-3 py-1 rounded-full uppercase tracking-widest z-10">-20% Off</span>
+<img alt="Alpine Purifying Gel" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQdQF4jk-0KewJ8TY8JJ6DET886kqEceJTBbchuoMureg3ZxexLohwmY18zFCpqfWvCZqqf7NHSqwGkgmLDkxIYVBrdbYPcl9APMdsw9tfLAsU1VjSzHkTTnqv9gXz1t82p79VWN56iofsmpQ4LftUkwpoK_rSIhzZjIbFByfo6NKu8RtUYv-I7ZWTTLE3ObRsS_WU-mjmL8q2Ab0MbzCQiQlmqXVrGa1vL-pHUaUaH7yIMhoM2s4naPL6c1ZvZGcil94uGtTXsfw">
+</div>
+<div class="flex flex-col gap-1">
+<h4 class="font-headline-md text-[24px] text-primary">Alpine Purifying Gel</h4>
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-primary-container font-semibold">$38</span>
+<span class="font-body-md text-secondary line-through opacity-60">$48</span>
+</div>
+</div>
+</div>
+<!-- Deal 2 -->
+<div class="shrink-0 snap-start w-[280px] md:w-[320px] flex flex-col gap-4 group">
+<div class="aspect-[3/4] bg-surface-container rounded-xl overflow-hidden relative">
+<span class="absolute top-4 left-4 bg-primary text-on-primary font-label-md text-[10px] px-3 py-1 rounded-full uppercase tracking-widest z-10">Special Deal</span>
+<img alt="Barrier Defense Mist" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAgNZNaHs7EDGm6whUQOWuVwq2UoGESnakwNVaZLZmy-g-6UaPdgEvtfTx47h-KrwkqYKTZ9p8HfW-c0tArMwZ3DteJV6sjGRRawoJ5jGxHCSB9K4IjGQ8u1KAGZa7WsdPk33a-jIEh0TBeuzS0DZ-4ZdkyR2tzpM6w-hp-1XOspzYYGVB_muHzCAoAopG9i4KMgIeqGmuHs-ymJNgCXPAAu7D6Osx7roOzPpVE_quHeAfyeINbsY-7-W1LPiMilS4SCc8DJxXiKO0">
+</div>
+<div class="flex flex-col gap-1">
+<h4 class="font-headline-md text-[24px] text-primary">Barrier Defense Mist</h4>
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-primary-container font-semibold">$25</span>
+<span class="font-body-md text-secondary line-through opacity-60">$35</span>
+</div>
+</div>
+</div>
+<!-- Deal 3 -->
+<div class="shrink-0 snap-start w-[280px] md:w-[320px] flex flex-col gap-4 group">
+<div class="aspect-[3/4] bg-surface-container rounded-xl overflow-hidden relative">
+<span class="absolute top-4 left-4 bg-primary text-on-primary font-label-md text-[10px] px-3 py-1 rounded-full uppercase tracking-widest z-10">Limited</span>
+<img alt="Lipid Recovery Cream" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvmaCvBWRwa-kCwLUwfh5jEKb5tdZgPaofZGYCmRaIcfq5VdYBrO8zLYhDYN5oooaFuajemSOTNutjo1yfJwOPQCSBTO3b_9wmzCPJujKNvSyvu6rB2-aJvW86LiKkN2B9LCSshJ9s9e3WH7evShdkRRi77yjzhwyMm3z7tsu6LCSTPaB1wL1PiffBIaxdfUdAvWOOsorVMgr2w02JsQwqBTgy1-MJO2iTLk4RjRyEWXIblHbKF78abrvwayKqbAqFi4rb3CIzq2E">
+</div>
+<div class="flex flex-col gap-1">
+<h4 class="font-headline-md text-[24px] text-primary">Lipid Recovery Cream</h4>
+<div class="flex items-center gap-3">
+<span class="font-body-lg text-primary-container font-semibold">$65</span>
+<span class="font-body-md text-secondary line-through opacity-60">$85</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-surface/95 backdrop-blur-md dark:bg-surface-container-lowest border-t border-outline-variant pb-safe h-20">
+<!-- Home (Active) -->
+<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed font-bold hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-md text-label-md mt-1">Home</span>
+</a>
+<!-- Shop (Inactive) -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">splitscreen</span>
+<span class="font-label-md text-label-md mt-1">Shop</span>
+</a>
+<!-- Bag (Inactive) -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">shopping_bag</span>
+<span class="font-label-md text-label-md mt-1">Bag</span>
+</a>
+<!-- Account (Inactive) -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-md text-label-md mt-1">Account</span>
+</a>
+</nav>
+</body></html>

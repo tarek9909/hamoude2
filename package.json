@@ -1,0 +1,20 @@
+{
+  "name": "storefront-template",
+  "version": "1.0.0",
+  "description": "Universal customer storefront template and Flutter app runner",
+  "scripts": {
+    "dev": "npx -y http-server -p 5500 -o",
+    "flutter:windows": "C:\\src\\flutter\\bin\\flutter.bat run -d windows",
+    "flutter:chrome": "C:\\src\\flutter\\bin\\flutter.bat run -d chrome",
+    "flutter:chrome:slug": "C:\\src\\flutter\\bin\\flutter.bat run -d chrome --dart-define=STORE_SLUG=your-store"
+  },
+  "keywords": [
+    "storefront-template",
+    "storefront",
+    "flutter",
+    "app",
+    "retail-platform"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}
