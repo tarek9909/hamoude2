@@ -3,6 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_refresh.dart';
+import '../widgets/app_shimmer.dart';
+import 'catalog_screen.dart';
 
 /// Enum to distinguish between browsing brands or categories.
 enum BrowseMode { brands, categories }
@@ -21,6 +24,8 @@ class BrowseCollectionScreen extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     final isBrands = mode == BrowseMode.brands;
+    final isEnabled =
+        isBrands ? appState.brandsEnabled : appState.categoriesEnabled;
     final title = isBrands ? 'Shop by Brand' : 'Shop by Category';
     final subtitle = isBrands
         ? 'Explore our curated selection of premium botanical brands.'
@@ -29,219 +34,243 @@ class BrowseCollectionScreen extends StatelessWidget {
     // Build display items from AppState data
     final List<Map<String, String>> items = isBrands
         ? appState.brands.map((b) {
+            final rawImageUrl = b['logo_url']?.toString() ??
+                b['image_url']?.toString() ??
+                b['image']?.toString() ??
+                '';
             return {
               'id': b['id']?.toString() ?? '',
               'name': b['name']?.toString() ?? 'Brand',
-              'image': b['logo_url']?.toString() ??
-                  b['image_url']?.toString() ??
-                  'https://images.unsplash.com/photo-1594035910387-fea47794261f?q=80&w=300&auto=format&fit=crop',
+              'image': appState.api.resolveMediaUrl(rawImageUrl),
             };
           }).toList()
-        : appState.categories
-            .where((c) => c != 'All')
-            .map((c) {
-              String img =
-                  'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?q=80&w=400&auto=format&fit=crop';
-              if (c.toLowerCase().contains('cleanser')) {
-                img =
-                    'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?q=80&w=400&auto=format&fit=crop';
-              } else if (c.toLowerCase().contains('serum')) {
-                img =
-                    'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?q=80&w=400&auto=format&fit=crop';
-              } else if (c.toLowerCase().contains('toner')) {
-                img =
-                    'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?q=80&w=400&auto=format&fit=crop';
-              } else if (c.toLowerCase().contains('moistur')) {
-                img =
-                    'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?q=80&w=400&auto=format&fit=crop';
-              } else if (c.toLowerCase().contains('mask')) {
-                img =
-                    'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?q=80&w=400&auto=format&fit=crop';
-              } else if (c.toLowerCase().contains('oil')) {
-                img =
-                    'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?q=80&w=400&auto=format&fit=crop';
-              }
-              return {
-                'id': c,
-                'name': c,
-                'image': img,
-              };
-            })
-            .toList();
+        : appState.categoryRecords.map((category) {
+            final rawImageUrl = category['image_url']?.toString() ??
+                category['image']?.toString() ??
+                '';
+            return {
+              'id': category['id']?.toString() ?? '',
+              'name': category['name']?.toString() ?? '',
+              'image': appState.api.resolveMediaUrl(rawImageUrl),
+            };
+          }).where((category) {
+            return (category['name'] ?? '').isNotEmpty;
+          }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAF5),
+      backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // Premium Header with Back Button
-            SliverToBoxAdapter(
-              child: Padding(
-                padding:
-                    const EdgeInsets.only(left: 8, right: 24, top: 12, bottom: 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.arrow_back_ios_new,
-                          color: colors.primary, size: 20),
-                      onPressed: () => Navigator.pop(context),
-                      tooltip: 'Back',
-                    ),
-                    const Spacer(),
-                    Text(
-                      appState.appName.toUpperCase(),
-                      style: GoogleFonts.ebGaramond(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 3.0,
-                        color: colors.primary,
-                      ),
-                    ),
-                    const Spacer(),
-                    const SizedBox(width: 48), // Balance the back button width
-                  ],
-                ),
-              ),
+        bottom: false,
+        child: AppRefresh(
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
             ),
-
-            // Title and Subtitle
-            SliverToBoxAdapter(
-              child: Padding(
-                padding:
-                    const EdgeInsets.only(left: 24, right: 24, top: 20, bottom: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.ebGaramond(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF070F0A),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.manrope(
-                        fontSize: 13.5,
-                        color: const Color(0xFF5E5E5B),
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Divider(thickness: 0.6, height: 24),
-                  ],
-                ),
-              ),
-            ),
-
-            // Item Count Badge
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(100),
-                      ),
-                      child: Text(
-                        '${items.length} ${isBrands ? 'BRANDS' : 'CATEGORIES'}',
-                        style: GoogleFonts.manrope(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: colors.primary,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-            // Empty State
-            if (items.isEmpty)
+            slivers: [
+              // Premium Header with Back Button
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 80),
-                  child: Column(
+                  padding: const EdgeInsets.only(
+                      left: 8, right: 24, top: 12, bottom: 4),
+                  child: Row(
                     children: [
-                      Icon(
-                        isBrands
-                            ? Icons.business_outlined
-                            : Icons.category_outlined,
-                        size: 48,
-                        color: AppTheme.border,
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_ios_new,
+                            color: colors.primary, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                        tooltip: 'Back',
                       ),
-                      const SizedBox(height: 16),
+                      const Spacer(),
                       Text(
-                        isBrands
-                            ? 'No brands available yet.'
-                            : 'No categories available yet.',
+                        appState.appName.toUpperCase(),
                         style: GoogleFonts.ebGaramond(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
+                          letterSpacing: 3.0,
+                          color: colors.primary,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const Spacer(),
+                      const SizedBox(
+                          width: 48), // Balance the back button width
+                    ],
+                  ),
+                ),
+              ),
+
+              // Title and Subtitle
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                      left: 24, right: 24, top: 20, bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Check back soon for updates.',
+                        title,
+                        style: GoogleFonts.ebGaramond(
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF070F0A),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        subtitle,
                         style: GoogleFonts.manrope(
-                          fontSize: 12,
-                          color: AppTheme.secondary,
+                          fontSize: 13.5,
+                          color: const Color(0xFF5E5E5B),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(thickness: 0.6, height: 24),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Item Count Badge
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          '${items.length} ${isBrands ? 'BRANDS' : 'CATEGORIES'}',
+                          style: GoogleFonts.manrope(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: colors.primary,
+                            letterSpacing: 1.5,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              )
-            else
-              // Dynamic Grid
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: isBrands ? 3 : 2,
-                    childAspectRatio: isBrands ? 0.78 : 0.72,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 18,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = items[index];
-                      return _CollectionItemCard(
-                        name: item['name'] ?? '',
-                        imageUrl: item['image'] ?? '',
-                        isBrand: isBrands,
-                        onTap: () {
-                          if (isBrands) {
-                            appState.setSearchQuery(item['name'] ?? '');
-                          } else {
-                            appState.setCategory(item['name'] ?? 'All');
-                          }
-                          // Switch to the Search/Catalog tab (index 1) and pop back
-                          appState.setTabIndex(1);
-                          Navigator.pop(context);
-                        },
-                      );
-                    },
-                    childCount: items.length,
-                  ),
-                ),
               ),
 
-            // Bottom safe spacing for floating nav bar
-            const SliverToBoxAdapter(child: SizedBox(height: 120)),
-          ],
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              if (!isEnabled)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 80, horizontal: 32),
+                    child: Column(
+                      children: [
+                        Icon(Icons.lock_outline,
+                            size: 48, color: AppTheme.border),
+                        const SizedBox(height: 16),
+                        Text(
+                          '${isBrands ? 'Brands' : 'Categories'} unavailable',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.ebGaramond(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'This browsing option is disabled for this store.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.manrope(
+                            fontSize: 12,
+                            color: AppTheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+              // Empty State
+              if (items.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 80),
+                    child: Column(
+                      children: [
+                        Icon(
+                          isBrands
+                              ? Icons.business_outlined
+                              : Icons.category_outlined,
+                          size: 48,
+                          color: AppTheme.border,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          isBrands
+                              ? 'No brands available yet.'
+                              : 'No categories available yet.',
+                          style: GoogleFonts.ebGaramond(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Check back soon for updates.',
+                          style: GoogleFonts.manrope(
+                            fontSize: 12,
+                            color: AppTheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                // Dynamic Grid
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverGrid(
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: isBrands ? 3 : 2,
+                      childAspectRatio: isBrands ? 0.78 : 0.72,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 18,
+                    ),
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final item = items[index];
+                        return _CollectionItemCard(
+                          name: item['name'] ?? '',
+                          imageUrl: item['image'] ?? '',
+                          isBrand: isBrands,
+                          onTap: () {
+                            final itemName = item['name'] ?? '';
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ShopCatalogScreen(
+                                  brandFilter: isBrands ? itemName : null,
+                                  categoryFilter: isBrands ? null : itemName,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                      childCount: items.length,
+                    ),
+                  ),
+                ),
+
+              // Bottom safe spacing for floating nav bar
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            ],
+          ),
         ),
       ),
     );
@@ -291,15 +320,15 @@ class _CollectionItemCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      imageUrl,
+                    ShimmerImage(
+                      imageUrl: imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorWidget: Container(
                         color: const Color(0xFFEBECE8),
                         child: Icon(
-                          isBrand
-                              ? Icons.business
-                              : Icons.spa_outlined,
+                          isBrand ? Icons.business : Icons.spa_outlined,
                           color: const Color(0xFF7E807C),
                           size: 36,
                         ),

@@ -3,10 +3,15 @@
   "version": "1.0.0",
   "description": "Universal customer storefront template and Flutter app runner",
   "scripts": {
-    "dev": "npx -y http-server -p 5500 -o",
     "flutter:windows": "C:\\src\\flutter\\bin\\flutter.bat run -d windows",
     "flutter:chrome": "C:\\src\\flutter\\bin\\flutter.bat run -d chrome",
-    "flutter:chrome:slug": "C:\\src\\flutter\\bin\\flutter.bat run -d chrome --dart-define=STORE_SLUG=your-store"
+    "flutter:chrome:slug": "C:\\src\\flutter\\bin\\flutter.bat run -d chrome --dart-define=STORE_SLUG=your-store",
+    "flutter:run:skin-cella": "C:\\src\\flutter\\bin\\flutter.bat run --dart-define=STORE_SLUG=skin-cella",
+    "flutter:run:klargo": "C:\\src\\flutter\\bin\\flutter.bat run --dart-define=STORE_SLUG=klargo",
+    "flutter:run:asd": "C:\\src\\flutter\\bin\\flutter.bat run --dart-define=STORE_SLUG=asd",
+    "flutter:build:skin-cella": "C:\\src\\flutter\\bin\\flutter.bat build apk --dart-define=STORE_SLUG=skin-cella",
+    "flutter:build:klargo": "C:\\src\\flutter\\bin\\flutter.bat build apk --dart-define=STORE_SLUG=klargo",
+    "flutter:build:asd": "C:\\src\\flutter\\bin\\flutter.bat build apk --dart-define=STORE_SLUG=asd"
   },
   "keywords": [
     "storefront-template",

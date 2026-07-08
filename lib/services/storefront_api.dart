@@ -25,6 +25,19 @@ class StoreBranding {
     this.backgroundColor,
   });
 
+  factory StoreBranding.fromJson(Map<String, dynamic> json) {
+    return StoreBranding(
+      name: (json['name'] ?? StorefrontApi.defaultStoreSlug).toString(),
+      slug: (json['slug'] ?? StorefrontApi.defaultStoreSlug).toString(),
+      logoUrl: json['logo_url']?.toString(),
+      primaryColor: json['primary_color']?.toString(),
+      secondaryColor: json['secondary_color']?.toString(),
+      accentColor: json['accent_color']?.toString(),
+      textColor: json['text_color']?.toString(),
+      backgroundColor: json['background_color']?.toString(),
+    );
+  }
+
   factory StoreBranding.fromConfig(
     Map<String, dynamic> config, {
     required String fallbackSlug,
@@ -43,6 +56,45 @@ class StoreBranding {
       backgroundColor: theme['background_color']?.toString(),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'slug': slug,
+      if (logoUrl != null) 'logo_url': logoUrl,
+      if (primaryColor != null) 'primary_color': primaryColor,
+      if (secondaryColor != null) 'secondary_color': secondaryColor,
+      if (accentColor != null) 'accent_color': accentColor,
+      if (textColor != null) 'text_color': textColor,
+      if (backgroundColor != null) 'background_color': backgroundColor,
+    };
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StoreBranding &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          slug == other.slug &&
+          logoUrl == other.logoUrl &&
+          primaryColor == other.primaryColor &&
+          secondaryColor == other.secondaryColor &&
+          accentColor == other.accentColor &&
+          textColor == other.textColor &&
+          backgroundColor == other.backgroundColor;
+
+  @override
+  int get hashCode => Object.hash(
+        name,
+        slug,
+        logoUrl,
+        primaryColor,
+        secondaryColor,
+        accentColor,
+        textColor,
+        backgroundColor,
+      );
 }
 
 class StorefrontApiException implements Exception {
@@ -55,22 +107,54 @@ class StorefrontApiException implements Exception {
   String toString() => message;
 }
 
+class BranchHour {
+  final int dayOfWeek;
+  final String? openTime;
+  final String? closeTime;
+  final bool isClosed;
+
+  const BranchHour({
+    required this.dayOfWeek,
+    this.openTime,
+    this.closeTime,
+    required this.isClosed,
+  });
+
+  factory BranchHour.fromJson(Map<String, dynamic> json) {
+    return BranchHour(
+      dayOfWeek: (json['day_of_week'] as num?)?.toInt() ?? 0,
+      openTime: json['open_time']?.toString(),
+      closeTime: json['close_time']?.toString(),
+      isClosed: (json['is_closed'] as num?)?.toInt() == 1,
+    );
+  }
+}
+
 class StorefrontBranch {
   final int id;
   final String name;
   final String? address;
+  final List<BranchHour> hours;
 
   const StorefrontBranch({
     required this.id,
     required this.name,
     this.address,
+    required this.hours,
   });
 
   factory StorefrontBranch.fromJson(Map<String, dynamic> json) {
+    final rawHours = json['hours'] as List? ?? [];
+    final hoursList = rawHours
+        .whereType<Map<String, dynamic>>()
+        .map(BranchHour.fromJson)
+        .toList();
+
     return StorefrontBranch(
       id: (json['id'] as num?)?.toInt() ?? 0,
       name: json['name']?.toString() ?? 'Store Branch',
       address: json['address_line_1']?.toString(),
+      hours: hoursList,
     );
   }
 }
@@ -88,7 +172,7 @@ class CustomerSession {
 class StorefrontApi {
   static const defaultStoreSlug = String.fromEnvironment(
     'STORE_SLUG',
-    defaultValue: 'asd',
+    defaultValue: 'skin-cella',
   );
 
   final String baseUrl;
@@ -102,7 +186,7 @@ class StorefrontApi {
   })  : baseUrl = (baseUrl ??
                 const String.fromEnvironment(
                   'STOREFRONT_API_BASE_URL',
-                  defaultValue: 'http://192.168.10.210:4000/api/v1/storefront',
+                  defaultValue: 'https://dashboard.zeyy.app/api/v1/storefront',
                 ))
             .replaceAll(RegExp(r'/+$'), ''),
         _client = client ?? http.Client();
@@ -118,6 +202,27 @@ class StorefrontApi {
     );
   }
 
+  String getLegalPolicyUrl(String type) {
+    const overrideUrl = String.fromEnvironment('DASHBOARD_URL');
+    if (overrideUrl.isNotEmpty) {
+      return '${overrideUrl.replaceAll(RegExp(r"/+$"), "")}/admin/$storeSlug/legal/$type';
+    }
+
+    final uri = Uri.parse(baseUrl);
+    String host = uri.host;
+    int? port = uri.port;
+    String scheme = uri.scheme;
+
+    String dashboardHost = host;
+    if (port == 4000) {
+      dashboardHost = '$host:5173';
+    } else if (port > 0) {
+      dashboardHost = '$host:$port';
+    }
+
+    return '$scheme://$dashboardHost/admin/$storeSlug/legal/$type';
+  }
+
   String resolveMediaUrl(String? value) {
     final rawValue = value?.trim() ?? '';
     if (rawValue.isEmpty || rawValue.startsWith('data:')) {
@@ -130,6 +235,13 @@ class StorefrontApi {
         : '';
 
     final parsedMediaUri = Uri.tryParse(rawValue);
+    if (parsedMediaUri != null && parsedMediaUri.hasScheme) {
+      final host = parsedMediaUri.host.toLowerCase();
+      if (host == '127.0.0.1' || host == 'localhost') {
+        return '$origin${parsedMediaUri.path}${parsedMediaUri.hasQuery ? "?${parsedMediaUri.query}" : ""}';
+      }
+    }
+
     if (parsedMediaUri != null &&
         parsedMediaUri.hasScheme &&
         parsedMediaUri.path.startsWith('/uploads/')) {
@@ -172,12 +284,13 @@ class StorefrontApi {
 
     for (final entry in normalized.entries.toList()) {
       final value = entry.value;
-      if (value is Map<String, dynamic>) {
-        normalized[entry.key] = _normalizeMediaUrls(value);
+      if (value is Map) {
+        normalized[entry.key] =
+            _normalizeMediaUrls(Map<String, dynamic>.from(value));
       } else if (value is List) {
         normalized[entry.key] = value.map((item) {
-          return item is Map<String, dynamic>
-              ? _normalizeMediaUrls(item)
+          return item is Map
+              ? _normalizeMediaUrls(Map<String, dynamic>.from(item))
               : item;
         }).toList();
       }
@@ -186,17 +299,25 @@ class StorefrontApi {
     return normalized;
   }
 
+  Map<String, dynamic> _cartItemPayload(CartItem item) => {
+        'product_id': item.product.id,
+        if (item.variantId.isNotEmpty) 'variant_id': item.variantId,
+        'quantity': item.quantity,
+      };
+
   Future<Map<String, dynamic>> _request(
     String path, {
     String method = 'GET',
     Map<String, dynamic>? query,
     Map<String, dynamic>? body,
     CustomerSession? session,
+    String? wholesaleToken,
   }) async {
     final headers = <String, String>{
       'Accept': 'application/json',
       if (body != null) 'Content-Type': 'application/json',
       if (session != null) 'x-customer-token': session.customerToken,
+      if (wholesaleToken != null) 'x-wholesale-token': wholesaleToken,
     };
 
     final response = await _client
@@ -226,6 +347,84 @@ class StorefrontApi {
 
   Future<Map<String, dynamic>> getConfig() async {
     final payload = await _request('config');
+    final data = (payload['data'] as Map<String, dynamic>?) ?? {};
+    return _normalizeMediaUrls(data);
+  }
+
+  Future<Map<String, dynamic>> requestWholesaleAccess(String password) async {
+    final payload = await _request(
+      'wholesale/access',
+      method: 'POST',
+      body: {'password': password},
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<List<Product>> listWholesaleProducts({
+    required String wholesaleToken,
+    int? branchId,
+    String? search,
+    String? categoryId,
+  }) async {
+    final payload = await _request(
+      'wholesale/products',
+      wholesaleToken: wholesaleToken,
+      query: {
+        'per_page': 100,
+        if (branchId != null) 'branch_id': branchId,
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (categoryId != null && categoryId.isNotEmpty)
+          'category_id': categoryId,
+      },
+    );
+    final data = payload['data'];
+    if (data is! List) {
+      return [];
+    }
+
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(_normalizeMediaUrls)
+        .map(Product.fromJson)
+        .where((product) => product.id.isNotEmpty)
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> checkoutWholesale({
+    required String wholesaleToken,
+    required int branchId,
+    required List<CartItem> items,
+    required String orderType,
+    int? customerId,
+    String? customerToken,
+    int? deliveryAddressId,
+    int? deliveryZoneId,
+    String? notes,
+    String? pickupTime,
+  }) async {
+    final session = customerId != null && customerToken != null
+        ? CustomerSession(customerId: customerId, customerToken: customerToken)
+        : null;
+    final payload = await _request(
+      'wholesale/checkout',
+      method: 'POST',
+      session: session,
+      wholesaleToken: wholesaleToken,
+      body: {
+        'branch_id': branchId,
+        'order_type': orderType,
+        'payment_method': 'cod',
+        'idempotency_key':
+            '$storeSlug-wholesale-${DateTime.now().millisecondsSinceEpoch}',
+        if (customerId != null) 'customer_id': customerId,
+        if (deliveryAddressId != null) 'delivery_address_id': deliveryAddressId,
+        if (deliveryZoneId != null) 'delivery_zone_id': deliveryZoneId,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        if (pickupTime != null && pickupTime.isNotEmpty)
+          'pickup_time': pickupTime,
+        'items': items.map(_cartItemPayload).toList(),
+      },
+    );
     return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
@@ -324,7 +523,10 @@ class StorefrontApi {
   }) async {
     return _listData(
       productId == null ? 'reviews' : 'products/$productId/reviews',
-      query: {if (branchId != null) 'branch_id': branchId},
+      query: {
+        if (branchId != null) 'branch_id': branchId,
+        'per_page': 100,
+      },
     );
   }
 
@@ -341,12 +543,7 @@ class StorefrontApi {
         'branch_id': branchId,
         'order_type': orderType,
         if (deliveryZoneId != null) 'delivery_zone_id': deliveryZoneId,
-        'items': items
-            .map((item) => {
-                  'product_id': item.product.id,
-                  'quantity': item.quantity,
-                })
-            .toList(),
+        'items': items.map(_cartItemPayload).toList(),
       },
     );
     return (payload['data'] as Map<String, dynamic>?) ?? {};
@@ -361,6 +558,7 @@ class StorefrontApi {
     int? deliveryAddressId,
     int? deliveryZoneId,
     String? notes,
+    String? pickupTime,
   }) async {
     final session = customerId != null && customerToken != null
         ? CustomerSession(customerId: customerId, customerToken: customerToken)
@@ -372,27 +570,38 @@ class StorefrontApi {
       body: {
         'branch_id': branchId,
         'order_type': orderType,
-        'payment_method': 'card',
+        'payment_method': 'cod',
         'idempotency_key':
             '$storeSlug-${DateTime.now().millisecondsSinceEpoch}',
         if (customerId != null) 'customer_id': customerId,
         if (deliveryAddressId != null) 'delivery_address_id': deliveryAddressId,
         if (deliveryZoneId != null) 'delivery_zone_id': deliveryZoneId,
         if (notes != null && notes.isNotEmpty) 'notes': notes,
-        'items': items
-            .map((item) => {
-                  'product_id': item.product.id,
-                  'quantity': item.quantity,
-                })
-            .toList(),
+        if (pickupTime != null && pickupTime.isNotEmpty)
+          'pickup_time': pickupTime,
+        'items': items.map(_cartItemPayload).toList(),
       },
     );
     return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
-  Future<Map<String, dynamic>> requestOtp(String identifier) async {
+  Future<Map<String, dynamic>> requestOtp(String identifier,
+      {bool checkExists = false, bool checkNotExists = false}) async {
     final payload = await _request(
       'auth/request-otp',
+      method: 'POST',
+      body: {
+        'identifier': identifier,
+        'checkExists': checkExists,
+        'checkNotExists': checkNotExists,
+      },
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<Map<String, dynamic>> requestPasswordReset(String identifier) async {
+    final payload = await _request(
+      'auth/password-reset-request',
       method: 'POST',
       body: {'identifier': identifier},
     );
@@ -471,6 +680,19 @@ class StorefrontApi {
     return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
+  Future<Map<String, dynamic>> cancelOrder({
+    required String orderId,
+    required CustomerSession session,
+  }) async {
+    final payload = await _request(
+      'orders/$orderId/cancel',
+      method: 'POST',
+      session: session,
+      body: {'customer_id': session.customerId},
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
   Future<List<Map<String, dynamic>>> listNotifications(
       CustomerSession session) async {
     final payload = await _request(
@@ -515,6 +737,96 @@ class StorefrontApi {
       session: session,
     );
     return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<Map<String, dynamic>> updateProfile({
+    required CustomerSession session,
+    required String name,
+    required String email,
+    required String phone,
+    required String dob,
+    required String gender,
+    String? password,
+  }) async {
+    final payload = await _request(
+      'me',
+      method: 'PATCH',
+      session: session,
+      body: {
+        'customer_id': session.customerId,
+        'full_name': name,
+        'email': email,
+        'phone': phone,
+        'date_of_birth': dob,
+        'gender': gender,
+        if (password != null && password.isNotEmpty) 'password': password,
+      },
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<CustomerSession> loginWithPassword({
+    required String identifier,
+    required String password,
+  }) async {
+    final payload = await _request(
+      'auth/login',
+      method: 'POST',
+      body: {
+        'identifier': identifier,
+        'password': password,
+      },
+    );
+    final data = (payload['data'] as Map<String, dynamic>?) ?? {};
+    final customer = (data['customer'] as Map<String, dynamic>?) ?? {};
+    return CustomerSession(
+      customerId: (customer['id'] as num?)?.toInt() ?? 0,
+      customerToken: data['customer_token']?.toString() ?? '',
+    );
+  }
+
+  Future<CustomerSession> registerWithPhonePassword({
+    required String name,
+    required String phone,
+    required String dob,
+    required String gender,
+    required String password,
+  }) async {
+    final payload = await _request(
+      'auth/register',
+      method: 'POST',
+      body: {
+        'full_name': name,
+        'phone': phone,
+        'date_of_birth': dob,
+        'gender': gender,
+        'password': password,
+      },
+    );
+    final data = (payload['data'] as Map<String, dynamic>?) ?? {};
+    final customer = (data['customer'] as Map<String, dynamic>?) ?? {};
+    return CustomerSession(
+      customerId: (customer['id'] as num?)?.toInt() ?? 0,
+      customerToken: data['customer_token']?.toString() ?? '',
+    );
+  }
+
+  Future<void> logout(CustomerSession session) async {
+    await _request(
+      'auth/logout',
+      method: 'POST',
+      session: session,
+      body: {'customer_id': session.customerId},
+    );
+  }
+
+  Future<void> deleteAccount(CustomerSession session) async {
+    await _request(
+      'me',
+      method: 'DELETE',
+      session: session,
+      body: {'customer_id': session.customerId},
+    );
   }
 
   Future<List<Map<String, dynamic>>> listAddresses(
@@ -575,6 +887,7 @@ class StorefrontApi {
     required String subject,
     required String message,
     String? category,
+    List<Map<String, dynamic>>? attachments,
     CustomerSession? session,
   }) async {
     final payload = await _request(
@@ -585,6 +898,7 @@ class StorefrontApi {
         'subject': subject,
         'message': message,
         if (category != null) 'category': category,
+        if (attachments != null) 'attachments': attachments,
         if (session != null) 'customer_id': session.customerId,
       },
     );
@@ -594,6 +908,7 @@ class StorefrontApi {
   Future<Map<String, dynamic>> replySupportTicket({
     required String ticketId,
     required String message,
+    List<Map<String, dynamic>>? attachments,
     required CustomerSession session,
   }) async {
     final payload = await _request(
@@ -603,8 +918,54 @@ class StorefrontApi {
       body: {
         'customer_id': session.customerId,
         'message': message,
+        if (attachments != null) 'attachments': attachments,
       },
     );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<Map<String, dynamic>> closeSupportTicket({
+    required String ticketId,
+    required CustomerSession session,
+  }) async {
+    final payload = await _request(
+      'support/tickets/$ticketId/close',
+      method: 'POST',
+      session: session,
+      body: {
+        'customer_id': session.customerId,
+      },
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<Map<String, dynamic>> uploadSupportAttachment({
+    required String filePath,
+    required String filename,
+    required CustomerSession session,
+  }) async {
+    final uri = Uri.parse('$baseUrl/$storeSlug/support/uploads');
+    final request = http.MultipartRequest('POST', uri);
+
+    request.headers['Authorization'] = 'Bearer ${session.customerToken}';
+
+    final multipartFile = await http.MultipartFile.fromPath(
+      'attachment',
+      filePath,
+      filename: filename,
+    );
+    request.files.add(multipartFile);
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw StorefrontApiException(
+        'Upload failed with status ${response.statusCode}: ${response.body}',
+      );
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
     return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
@@ -615,6 +976,20 @@ class StorefrontApi {
       query: {'customer_id': session.customerId},
       session: session,
     );
+  }
+
+  Future<Map<String, dynamic>> getSupportTicket({
+    required String ticketId,
+    required CustomerSession session,
+  }) async {
+    final payload = await _request(
+      'support/tickets/$ticketId',
+      method: 'GET',
+      session: session,
+      query: {'customer_id': session.customerId},
+    );
+    final data = (payload['data'] as Map<String, dynamic>?) ?? {};
+    return data;
   }
 
   Future<List<Map<String, dynamic>>> listServiceCases(
@@ -652,7 +1027,7 @@ class StorefrontApi {
   }
 
   Future<Map<String, dynamic>> createReview({
-    required String productId,
+    String? productId,
     required int rating,
     String? title,
     String? body,
@@ -663,7 +1038,7 @@ class StorefrontApi {
       method: 'POST',
       session: session,
       body: {
-        'product_id': productId,
+        if (productId != null && productId.isNotEmpty) 'product_id': productId,
         'rating': rating,
         if (title != null && title.isNotEmpty) 'title': title,
         if (body != null && body.isNotEmpty) 'body': body,
@@ -671,6 +1046,46 @@ class StorefrontApi {
       },
     );
     return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<void> deleteReview({
+    required int reviewId,
+    required CustomerSession session,
+  }) async {
+    await _request(
+      'reviews/$reviewId',
+      method: 'DELETE',
+      session: session,
+      body: {'customer_id': session.customerId},
+    );
+  }
+
+  Future<Map<String, dynamic>> submitTicketFeedback({
+    required String ticketId,
+    required int rating,
+    required String comment,
+    CustomerSession? session,
+  }) async {
+    final payload = await _request(
+      'support/tickets/$ticketId/feedback',
+      method: 'POST',
+      session: session,
+      body: {
+        'rating': rating,
+        'comment': comment,
+        if (session != null) 'customer_id': session.customerId,
+      },
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<List<Map<String, dynamic>>> listMyReviews(
+      CustomerSession session) async {
+    return _listData(
+      'me/reviews',
+      query: {'customer_id': session.customerId},
+      session: session,
+    );
   }
 
   Future<List<Map<String, dynamic>>> _listData(

@@ -16,6 +16,8 @@ dependencies:
   google_fonts: ^6.2.1
   http: ^1.2.1
   shared_preferences: ^2.3.2
+  image_picker: ^1.2.2
+  webview_flutter: ^4.8.0
 
 dev_dependencies:
   flutter_test:
@@ -25,7 +27,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
+  assets:
+    - assets/splash_logo.png

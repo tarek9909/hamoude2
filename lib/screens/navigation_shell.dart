@@ -1,12 +1,69 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'cart_screen.dart';
-import 'profile_screen.dart';
 import 'catalog_screen.dart';
+import 'profile_screen.dart';
 import 'orders_list_screen.dart';
+
+class SmoothCircularNotchedRectangle extends NotchedShape {
+  const SmoothCircularNotchedRectangle();
+
+  @override
+  Path getOuterPath(Rect host, Rect? guest) {
+    if (guest == null || !host.overlaps(guest)) {
+      return Path()..addRect(host);
+    }
+
+    final double r = guest.width / 2.0;
+    final notchRadius = Radius.circular(r);
+
+    // We increase s1 (horizontal transition length) to 36.0 to give
+    // the entry curves a much softer, more rounded and premium look.
+    const double s1 = 36.0;
+    const double s2 = 12.0;
+
+    final double a = -r - s2;
+    final double b = host.top - guest.center.dy;
+
+    final double n2 = math.sqrt(b * b * r * r * (a * a + b * b - r * r));
+    final double p2xA = ((a * r * r) - n2) / (a * a + b * b);
+    final double p2xB = ((a * r * r) + n2) / (a * a + b * b);
+    final double p2yA = math.sqrt(r * r - p2xA * p2xA);
+    final double p2yB = math.sqrt(r * r - p2xB * p2xB);
+
+    final p = List<Offset>.filled(6, Offset.zero);
+
+    p[0] = Offset(a - s1, b);
+    p[1] = Offset(a, b);
+    final cmp = b < 0 ? -1.0 : 1.0;
+    p[2] = cmp * p2yA > cmp * p2yB ? Offset(p2xA, p2yA) : Offset(p2xB, p2yB);
+
+    p[3] = Offset(-1.0 * p[2].dx, p[2].dy);
+    p[4] = Offset(-1.0 * p[1].dx, p[1].dy);
+    p[5] = Offset(-1.0 * p[0].dx, p[0].dy);
+
+    for (var i = 0; i < p.length; i += 1) {
+      p[i] += guest.center;
+    }
+
+    final path = Path()
+      ..moveTo(host.left, host.top)
+      ..lineTo(p[0].dx, p[0].dy)
+      ..quadraticBezierTo(p[1].dx, p[1].dy, p[2].dx, p[2].dy)
+      ..arcToPoint(p[3], radius: notchRadius, clockwise: false)
+      ..quadraticBezierTo(p[4].dx, p[4].dy, p[5].dx, p[5].dy)
+      ..lineTo(host.right, host.top)
+      ..lineTo(host.right, host.bottom)
+      ..lineTo(host.left, host.bottom)
+      ..close();
+
+    return path;
+  }
+}
 
 class NavigationShell extends StatefulWidget {
   const NavigationShell({super.key});
@@ -16,290 +73,196 @@ class NavigationShell extends StatefulWidget {
 }
 
 class _NavigationShellState extends State<NavigationShell> {
-  List<_NavDestination> _getDestinations(AppState appState) {
-    return [
-      const _NavDestination(
-        screen: HomeScreen(),
-        icon: Icons.home_outlined,
-        activeIcon: Icons.home,
-        label: 'HOME',
-      ),
-      const _NavDestination(
-        screen: ShopCatalogScreen(),
-        icon: Icons.search,
-        activeIcon: Icons.search,
-        label: 'SEARCH',
-      ),
-      const _NavDestination(
-        screen: CartScreen(),
-        icon: Icons.add,
-        activeIcon: Icons.add,
-        label: 'CART',
-      ),
-      const _NavDestination(
-        screen: TrackOrdersListScreen(),
-        icon: Icons.shopping_bag_outlined,
-        activeIcon: Icons.shopping_bag,
-        label: 'SHOP',
-      ),
-      const _NavDestination(
-        screen: ProfileScreen(),
-        icon: Icons.person_outline,
-        activeIcon: Icons.person,
-        label: 'ME',
-      ),
-    ];
-  }
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const ShopCatalogScreen(),
+    const CartScreen(),
+    const TrackOrdersListScreen(),
+    const ProfileScreen(),
+  ];
 
-  @override
-  Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    final destinations = _getDestinations(appState);
-
-    // Safeguard index selection
-    final currentIndex = appState.currentTabIndex >= destinations.length
-        ? 0 // Default to Home if index overflows
-        : appState.currentTabIndex;
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Active Page Screen
-          Positioned.fill(
-            child: IndexedStack(
-              index: currentIndex,
-              children: destinations.map((dest) => dest.screen).toList(),
-            ),
-          ),
-
-          // Custom Sticky Notch Bottom Bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildFloatingBottomBar(context, appState, currentIndex),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFloatingBottomBar(
-      BuildContext context, AppState appState, int currentIndex) {
-    final destinations = _getDestinations(appState);
-    const double baseBarHeight = 72.0;
-    final double safeAreaBottom = MediaQuery.of(context).padding.bottom;
-    final double totalBarHeight = baseBarHeight + safeAreaBottom;
-
-    // Hydrate backend primary and secondary colors dynamically
-    final colors = Theme.of(context).colorScheme;
-    final primaryColor = colors.primary;
-    final secondaryColor = colors.secondary;
-
-    return SizedBox(
-      width: MediaQuery.of(context).size.width,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomCenter,
-        children: [
-          // 1. Beautiful Custom Notched Background Bar taking the full screen width and extending to bottom
-          CustomPaint(
-            size: Size(MediaQuery.of(context).size.width, totalBarHeight),
-            painter: CustomNotchedPainter(color: primaryColor),
-          ),
-
-          // 2. Row of Navigation Icons (aligned precisely above the safe area)
-          Positioned(
-            bottom: safeAreaBottom,
-            left: 0,
-            right: 0,
-            height: baseBarHeight,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(0, destinations[0], currentIndex, appState),
-                _buildNavItem(1, destinations[1], currentIndex, appState),
-                const SizedBox(width: 76), // Spacer for central plus notch
-                _buildNavItem(3, destinations[3], currentIndex, appState),
-                _buildNavItem(4, destinations[4], currentIndex, appState),
-              ],
-            ),
-          ),
-
-          // 3. Central Vibrant Circular Plus Action Floating Button
-          Positioned(
-            bottom: totalBarHeight - 48, // Floating slightly above the notch cutout
-            child: GestureDetector(
-              onTap: () {
-                appState.setTabIndex(2); // Set active tab index to 2 (Cart screen)
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: currentIndex == 2
-                      ? secondaryColor // Backend secondary color for active Plus button
-                      : secondaryColor.withValues(alpha: 0.75), // Soft secondary color inactive
-                  boxShadow: [
-                    BoxShadow(
-                      color: secondaryColor.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    width: 1.5,
-                  ),
-                ),
-                child: _buildFabIcon(appState, currentIndex),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFabIcon(AppState appState, int currentIndex) {
-    final cartCount = appState.cart.fold(0, (sum, item) => sum + item.quantity);
-    Widget plusIcon = const Icon(
-      Icons.add,
-      color: Colors.white,
-      size: 32,
-    );
-
-    if (cartCount > 0) {
-      return Badge(
-        label: Text(
-          cartCount.toString(),
-          style: const TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: const Color(0xFFBA1A1A),
-        child: plusIcon,
-      );
-    }
-    return plusIcon;
-  }
-
-  Widget _buildNavItem(
-      int index, _NavDestination dest, int currentIndex, AppState appState) {
-    final isSelected = currentIndex == index;
+  Widget _buildTabItem({
+    required int index,
+    required IconData icon,
+    required IconData activeIcon,
+    required AppState appState,
+  }) {
+    final isSelected = appState.currentTabIndex == index;
+    // Gold active color matching mockup exactly, muted translucent white for inactive
     final color = isSelected
-        ? AppTheme.accent // Gold/coral accent highlight matching premium theme tokens from backend
-        : Colors.white.withValues(alpha: 0.55); // Soft white for inactive tabs
+        ? const Color(0xFFECC152)
+        : Colors.white.withValues(alpha: 0.6);
 
     return GestureDetector(
-      onTap: () {
-        appState.setTabIndex(index);
-      },
+      onTap: () => appState.setTabIndex(index),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 56,
-        height: 72,
+        width: 54,
+        height: 60,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              isSelected ? dest.activeIcon : dest.icon,
+              isSelected ? activeIcon : icon,
               color: color,
-              size: 26,
+              size: 24,
             ),
-            const SizedBox(height: 5),
-            // Sleek highlight dot under active icon instead of textual labels
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                color: isSelected ? color : Colors.transparent,
-                shape: BoxShape.circle,
+            if (isSelected) ...[
+              const SizedBox(height: 4),
+              Container(
+                width: 5,
+                height: 5,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFECC152),
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
+            ] else ...[
+              const SizedBox(
+                  height: 9), // Stable height placeholder to avoid jitter
+            ],
           ],
         ),
       ),
     );
   }
-}
-
-// Custom Painter to draw a flat sticky bottom bar with a deep, smooth notch cutout in the center
-class CustomNotchedPainter extends CustomPainter {
-  final Color color;
-  CustomNotchedPainter({required this.color});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
+  Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context);
+    final cartCount = appState.cart.fold(0, (sum, item) => sum + item.quantity);
+    final currentIndex = appState.isTabEnabled(appState.currentTabIndex)
+        ? appState.currentTabIndex
+        : appState.firstEnabledTabIndex;
 
-    final path = Path();
-    const double notchWidth = 84.0;
-    const double notchDepth = 52.0;
-    const double cpX = 56.0;
-    final double middle = size.width / 2;
-
-    // Start at top-left corner (0, 0) - completely flat, NO left radius
-    path.moveTo(0, 0);
-
-    // Top edge to start of notch curve
-    path.lineTo(middle - notchWidth, 0);
-
-    // Left half of the notch: smooth cubic bezier to the bottom middle
-    path.cubicTo(
-      middle - notchWidth + cpX,
-      0,
-      middle - cpX,
-      notchDepth,
-      middle,
-      notchDepth,
+    return Scaffold(
+      extendBody: true,
+      resizeToAvoidBottomInset: false,
+      body: IndexedStack(
+        index: currentIndex,
+        children: _screens,
+      ),
+      floatingActionButton: appState.checkoutEnabled
+          ? Container(
+              margin: const EdgeInsets.only(
+                  top:
+                      12), // Nestles the FAB beautifully deep inside the notch matching the picture exactly
+              child: SizedBox(
+                width: 70,
+                height: 70,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned.fill(
+                      child: FloatingActionButton(
+                        onPressed: () =>
+                            appState.setTabIndex(2), // CartScreen is index 2
+                        backgroundColor: const Color(
+                            0xFF818E82), // Soft sage grey/green matching mockup exactly
+                        shape: const CircleBorder(),
+                        elevation:
+                            0, // Matte, clean look with zero harsh shadows matching the picture exactly
+                        child: const Icon(Icons.shopping_cart_outlined,
+                            color: Colors.white,
+                            size: 28), // Sleek larger icon matching larger FAB
+                      ),
+                    ),
+                    if (cartCount > 0)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: const BoxDecoration(
+                              color: Color(
+                                  0xFFBA1A1A), // Brand-standard error red badge
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 20,
+                              minHeight: 20,
+                            ),
+                            child: Center(
+                              child: Text(
+                                cartCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        color: AppTheme.primaryContainer, // Dark forest green Color(0xFF1B261D)
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        clipBehavior: Clip.antiAlias,
+        shape: appState.checkoutEnabled
+            ? const SmoothCircularNotchedRectangle()
+            : null,
+        notchMargin:
+            12.0, // Make the edges around the middle button more rounded and spacious
+        padding: EdgeInsets.zero,
+        height: 64,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Left Group: Home & Search
+              Row(
+                children: [
+                  _buildTabItem(
+                      index: 0,
+                      icon: Icons.home,
+                      activeIcon: Icons.home,
+                      appState: appState),
+                  if (appState.productsEnabled) ...[
+                    const SizedBox(width: 12),
+                    _buildTabItem(
+                        index: 1,
+                        icon: Icons.search,
+                        activeIcon: Icons.search,
+                        appState: appState),
+                  ],
+                  const SizedBox(width: 20),
+                ],
+              ),
+              // Right Group: Bag/Browse & Profile
+              Row(
+                children: [
+                  const SizedBox(width: 20),
+                  if (appState.ordersEnabled)
+                    _buildTabItem(
+                        index: 3,
+                        icon: Icons.shopping_bag_outlined,
+                        activeIcon: Icons.shopping_bag,
+                        appState: appState),
+                  if (appState.ordersEnabled && appState.profileEnabled)
+                    const SizedBox(width: 12),
+                  if (appState.profileEnabled)
+                    _buildTabItem(
+                        index: 4,
+                        icon: Icons.person_outline,
+                        activeIcon: Icons.person,
+                        appState: appState),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-
-    // Right half of the notch: smooth cubic bezier rising out of the notch
-    path.cubicTo(
-      middle + cpX,
-      notchDepth,
-      middle + notchWidth - cpX,
-      0,
-      middle + notchWidth,
-      0,
-    );
-
-    // Top edge to top-right corner - flat, NO right radius
-    path.lineTo(size.width, 0);
-
-    // Right edge straight down to bottom-right corner
-    path.lineTo(size.width, size.height);
-
-    // Bottom edge flat left to bottom-left corner
-    path.lineTo(0, size.height);
-
-    // Left edge straight up to top-left corner
-    path.lineTo(0, 0);
-
-    path.close();
-
-    // Fill the path cleanly with no simulated top border shadow
-    canvas.drawPath(path, paint);
   }
-
-  @override
-  bool shouldRepaint(CustomNotchedPainter oldDelegate) => false;
-}
-
-class _NavDestination {
-  final Widget screen;
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
-
-  const _NavDestination({
-    required this.screen,
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-  });
 }

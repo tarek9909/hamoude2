@@ -4,37 +4,32 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/storefront_api.dart';
 
 class AppTheme {
-  static const Color fallbackPrimary = Color(0xFF061008);
-  static const Color fallbackBackground = Color(0xFFF8FAF5);
-  static const Color fallbackPrimaryContainer = Color(0xFF1B261D);
-  static const Color fallbackOnPrimaryContainer = Color(0xFF818E82);
-  static const Color fallbackSecondary = Color(0xFF5E5E5B);
-  static const Color fallbackAccent = Color(0xFFE9E2D0);
-  static const Color fallbackBorder = Color(0xFFC4C8C1);
-  static const Color fallbackSuccess = Color(0xFF556156);
+  static const Color _emergencyPrimary = Color(0xFF2E4A3F);
 
-  static Color primary = fallbackPrimary;
-  static Color background = fallbackBackground;
-  static Color surface = fallbackBackground;
-  static Color primaryContainer = fallbackPrimaryContainer;
-  static Color onPrimaryContainer = fallbackOnPrimaryContainer;
-  static Color secondary = fallbackSecondary;
-  static Color accent = fallbackAccent;
-  static Color border = fallbackBorder;
-  static Color success = fallbackSuccess;
+  static Color primary = _emergencyPrimary;
+  static Color background = _surfaceFrom(_emergencyPrimary);
+  static Color surface = _surfaceFrom(_emergencyPrimary);
+  static Color primaryContainer = _darken(_emergencyPrimary);
+  static Color onPrimaryContainer = _soften(_accentFrom(_emergencyPrimary));
+  static Color secondary = _soften(_emergencyPrimary);
+  static Color accent = _accentFrom(_emergencyPrimary);
+  static Color border = _soften(_emergencyPrimary);
+  static Color success = _successFrom(_emergencyPrimary);
 
   static ThemeData get lightTheme => lightThemeFor();
 
   static ThemeData lightThemeFor([StoreBranding? branding]) {
-    final primaryColor = _colorFromHex(branding?.primaryColor, fallbackPrimary);
+    final primaryColor =
+        _colorFromHex(branding?.primaryColor) ?? _emergencyPrimary;
     final secondaryColor =
-        _colorFromHex(branding?.secondaryColor, fallbackSecondary);
-    final accentColor = _colorFromHex(branding?.accentColor, fallbackAccent);
-    final textColor = _colorFromHex(branding?.textColor, primaryColor);
+        _colorFromHex(branding?.secondaryColor) ?? _soften(primaryColor);
+    final accentColor =
+        _colorFromHex(branding?.accentColor) ?? _accentFrom(primaryColor);
+    final textColor = _colorFromHex(branding?.textColor) ?? primaryColor;
     final backgroundColor =
-        _colorFromHex(branding?.backgroundColor, fallbackBackground);
+        _colorFromHex(branding?.backgroundColor) ?? _surfaceFrom(primaryColor);
     final borderColor = _soften(secondaryColor);
-    final successColor = _colorFromHex(null, fallbackSuccess);
+    final successColor = _successFrom(primaryColor);
     final primaryContainerColor = _darken(primaryColor);
     final onPrimaryContainerColor = _soften(accentColor);
 
@@ -59,6 +54,20 @@ class AppTheme {
         primaryContainer: primaryContainerColor,
         onPrimaryContainer: onPrimaryContainerColor,
         outlineVariant: borderColor,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: primaryColor,
+        contentTextStyle: GoogleFonts.manrope(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side:
+              BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 1),
+        ),
       ),
       scaffoldBackgroundColor: backgroundColor,
       appBarTheme: AppBarTheme(
@@ -149,15 +158,15 @@ class AppTheme {
     );
   }
 
-  static Color _colorFromHex(String? value, Color fallback) {
+  static Color? _colorFromHex(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return fallback;
+      return null;
     }
 
     final hex = value.trim().replaceFirst('#', '');
     final normalized = hex.length == 6 ? 'FF$hex' : hex;
     final parsed = int.tryParse(normalized, radix: 16);
-    return parsed == null ? fallback : Color(parsed);
+    return parsed == null ? null : Color(parsed);
   }
 
   static Color _darken(Color color) {
@@ -170,6 +179,31 @@ class AppTheme {
     return hsl
         .withSaturation((hsl.saturation * 0.45).clamp(0.0, 1.0))
         .withLightness((hsl.lightness + 0.2).clamp(0.0, 1.0))
+        .toColor();
+  }
+
+  static Color _accentFrom(Color color) {
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withHue((hsl.hue + 42) % 360)
+        .withSaturation((hsl.saturation * 0.32).clamp(0.08, 0.3))
+        .withLightness(0.88)
+        .toColor();
+  }
+
+  static Color _surfaceFrom(Color color) {
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withSaturation((hsl.saturation * 0.18).clamp(0.02, 0.14))
+        .withLightness(0.97)
+        .toColor();
+  }
+
+  static Color _successFrom(Color color) {
+    final hsl = HSLColor.fromColor(color);
+    return hsl
+        .withSaturation((hsl.saturation * 0.7).clamp(0.18, 0.5))
+        .withLightness((hsl.lightness * 0.88).clamp(0.28, 0.48))
         .toColor();
   }
 }
