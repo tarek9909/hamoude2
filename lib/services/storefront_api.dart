@@ -793,7 +793,7 @@ class StorefrontApi {
     required String password,
   }) async {
     final payload = await _request(
-      'auth/register',
+      'auth/register-phone',
       method: 'POST',
       body: {
         'full_name': name,
