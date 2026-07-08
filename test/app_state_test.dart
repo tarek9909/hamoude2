@@ -12,9 +12,8 @@ class FakeStorefrontApi extends StorefrontApi {
   String? lastRegisteredName;
   String? lastRegisteredPhone;
   String? lastRegisteredDob;
-  String? lastRegisteredGender;
   String? lastRegisteredPassword;
-  String? lastLoginIdentifier;
+  String? lastLoginPhone;
   String? lastLoginPassword;
   String? lastPasswordResetIdentifier;
   CustomerSession? lastLoggedOutSession;
@@ -141,23 +140,21 @@ class FakeStorefrontApi extends StorefrontApi {
     required String name,
     required String phone,
     required String dob,
-    required String gender,
     required String password,
   }) async {
     lastRegisteredName = name;
     lastRegisteredPhone = phone;
     lastRegisteredDob = dob;
-    lastRegisteredGender = gender;
     lastRegisteredPassword = password;
     return const CustomerSession(customerId: 7, customerToken: 'token-7');
   }
 
   @override
   Future<CustomerSession> loginWithPassword({
-    required String identifier,
+    required String phone,
     required String password,
   }) async {
-    lastLoginIdentifier = identifier;
+    lastLoginPhone = phone;
     lastLoginPassword = password;
     return const CustomerSession(customerId: 7, customerToken: 'token-7');
   }
@@ -726,7 +723,6 @@ void main() {
       name: 'Maya Customer',
       phone: '+96170000000',
       dob: '1996-01-02',
-      gender: 'female',
       password: 'super-secure-password',
     );
 
@@ -734,10 +730,10 @@ void main() {
     expect(fakeApi.lastRegisteredName, 'Maya Customer');
     expect(fakeApi.lastRegisteredPhone, '+96170000000');
     expect(fakeApi.lastRegisteredDob, '1996-01-02');
-    expect(fakeApi.lastRegisteredGender, 'female');
     expect(fakeApi.lastRegisteredPassword, 'super-secure-password');
     expect(prefs.getString('skin-cella_customer_identifier'), '+96170000000');
     expect(prefs.getString('skin-cella_customer_email'), isNull);
+    expect(prefs.getString('skin-cella_customer_gender'), isNull);
   });
 
   test('password login uses phone as identifier', () async {
@@ -746,14 +742,15 @@ void main() {
     await appState.refreshStorefrontData();
 
     await appState.loginWithPassword(
-      identifier: '+96170000000',
+      phone: '+96170000000',
       password: 'super-secure-password',
     );
 
     final prefs = await SharedPreferences.getInstance();
-    expect(fakeApi.lastLoginIdentifier, '+96170000000');
+    expect(fakeApi.lastLoginPhone, '+96170000000');
     expect(fakeApi.lastLoginPassword, 'super-secure-password');
     expect(prefs.getString('skin-cella_customer_identifier'), '+96170000000');
+    expect(prefs.getString('skin-cella_customer_email'), isNull);
   });
 
   test('sign out clears persisted customer credentials and scoped data',
@@ -769,10 +766,8 @@ void main() {
 
     await appState.registerWithPassword(
       name: 'Maya Customer',
-      email: 'maya@example.test',
       phone: '+96170000000',
       dob: '1996-01-02',
-      gender: 'female',
       password: 'super-secure-password',
       backendSession: appState.customerSession,
     );
@@ -892,14 +887,13 @@ void main() {
         name: 'Maya Customer',
         phone: '+96170000000',
         dob: '1996-01-02',
-        gender: 'female',
         password: 'super-secure-password',
       ),
       throwsA(isA<StorefrontApiException>()),
     );
     await expectLater(
       appState.loginWithPassword(
-        identifier: '+96170000000',
+        phone: '+96170000000',
         password: 'super-secure-password',
       ),
       throwsA(isA<StorefrontApiException>()),

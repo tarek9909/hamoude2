@@ -21,9 +21,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _phoneController = TextEditingController();
   final _dobController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
 
-  String? _selectedGender;
   bool _isLoading = false;
   bool _agreedToPolicies = false;
 
@@ -33,7 +31,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _phoneController.dispose();
     _dobController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -41,26 +38,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
     final dob = _dobController.text.trim();
-    final gender = _selectedGender;
     final password = _passwordController.text;
-    final confirmPassword = _confirmPasswordController.text;
 
-    if (name.isEmpty ||
-        phone.isEmpty ||
-        dob.isEmpty ||
-        gender == null ||
-        password.isEmpty) {
+    if (name.isEmpty || phone.isEmpty || dob.isEmpty || password.isEmpty) {
       showTopToast(context, 'Please fill out all required fields.');
       return;
     }
 
     if (password.length < 8) {
       showTopToast(context, 'Password must be at least 8 characters long.');
-      return;
-    }
-
-    if (password != confirmPassword) {
-      showTopToast(context, 'Passwords do not match.');
       return;
     }
 
@@ -78,7 +64,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         name: name,
         phone: phone,
         dob: dob,
-        gender: gender,
         password: password,
       );
       if (mounted) {
@@ -366,101 +351,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 20),
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                            left: 12.0, bottom: 6.0),
-                                        child: Text(
-                                          'GENDER',
-                                          style: GoogleFonts.manrope(
-                                            fontSize: 9.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppTheme.primary,
-                                            letterSpacing: 1.5,
-                                          ),
-                                        ),
-                                      ),
-                                      DropdownButtonFormField<String>(
-                                        initialValue: _selectedGender,
-                                        style: GoogleFonts.manrope(
-                                          fontSize: 13,
-                                          color: AppTheme.primary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        decoration: InputDecoration(
-                                          filled: true,
-                                          fillColor: Colors.white
-                                              .withValues(alpha: 0.55),
-                                          prefixIcon: Icon(
-                                            Icons.people_outline,
-                                            size: 18,
-                                            color: AppTheme.primary
-                                                .withValues(alpha: 0.55),
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                  horizontal: 24, vertical: 16),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(30),
-                                            borderSide: BorderSide(
-                                              color: AppTheme.primary
-                                                  .withValues(alpha: 0.25),
-                                              width: 1.2,
-                                            ),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(30),
-                                            borderSide: BorderSide(
-                                                color: AppTheme.primary,
-                                                width: 1.5),
-                                          ),
-                                          hintText: 'Select Gender',
-                                          hintStyle: GoogleFonts.manrope(
-                                            color: AppTheme.secondary
-                                                .withValues(alpha: 0.5),
-                                            fontSize: 12.5,
-                                          ),
-                                        ),
-                                        dropdownColor: AppTheme.background,
-                                        items: [
-                                          'Female',
-                                          'Male',
-                                          'Non-binary',
-                                          'Prefer not to say'
-                                        ]
-                                            .map((g) => DropdownMenuItem(
-                                                  value: g,
-                                                  child: Text(g),
-                                                ))
-                                            .toList(),
-                                        onChanged: (val) {
-                                          setState(() {
-                                            _selectedGender = val;
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 20),
                                   _buildTextField(
                                     controller: _passwordController,
                                     labelText: 'CREATE PASSWORD',
                                     hintText: 'Enter a secure password',
                                     prefixIcon: Icons.lock_outline,
-                                    obscureText: true,
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _buildTextField(
-                                    controller: _confirmPasswordController,
-                                    labelText: 'CONFIRM PASSWORD',
-                                    hintText: 'Confirm your password',
-                                    prefixIcon: Icons.lock_clock_outlined,
                                     obscureText: true,
                                   ),
                                   const SizedBox(height: 20),

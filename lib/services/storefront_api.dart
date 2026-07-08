@@ -766,14 +766,15 @@ class StorefrontApi {
   }
 
   Future<CustomerSession> loginWithPassword({
-    required String identifier,
+    required String phone,
     required String password,
   }) async {
     final payload = await _request(
       'auth/login',
       method: 'POST',
       body: {
-        'identifier': identifier,
+        'phone': phone,
+        'identifier': phone,
         'password': password,
       },
     );
@@ -789,7 +790,6 @@ class StorefrontApi {
     required String name,
     required String phone,
     required String dob,
-    required String gender,
     required String password,
   }) async {
     final payload = await _request(
@@ -799,7 +799,6 @@ class StorefrontApi {
         'full_name': name,
         'phone': phone,
         'date_of_birth': dob,
-        'gender': gender,
         'password': password,
       },
     );

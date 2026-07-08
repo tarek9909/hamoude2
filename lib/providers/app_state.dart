@@ -2176,9 +2176,7 @@ class AppState extends ChangeNotifier {
     required String name,
     required String phone,
     required String dob,
-    required String gender,
     required String password,
-    String email = '',
     CustomerSession? backendSession,
   }) async {
     CustomerSession? session = backendSession;
@@ -2194,7 +2192,6 @@ class AppState extends ChangeNotifier {
           name: name,
           phone: phone,
           dob: dob,
-          gender: gender,
           password: password,
         );
       } catch (e) {
@@ -2209,10 +2206,10 @@ class AppState extends ChangeNotifier {
     );
 
     profileName = name;
-    profileEmail = email;
+    profileEmail = '';
     profilePhone = phone;
     profileDob = dob;
-    profileGender = gender;
+    profileGender = '';
     _accountPassword = password;
 
     try {
@@ -2222,14 +2219,10 @@ class AppState extends ChangeNotifier {
           _storeScopedKey('customer_token'), session.customerToken);
       await prefs.setString(_storeScopedKey('customer_identifier'), phone);
       await prefs.setString(_storeScopedKey('customer_name'), name);
-      if (email.isNotEmpty) {
-        await prefs.setString(_storeScopedKey('customer_email'), email);
-      } else {
-        await prefs.remove(_storeScopedKey('customer_email'));
-      }
+      await prefs.remove(_storeScopedKey('customer_email'));
       await prefs.setString(_storeScopedKey('customer_phone'), phone);
       await prefs.setString(_storeScopedKey('customer_dob'), dob);
-      await prefs.setString(_storeScopedKey('customer_gender'), gender);
+      await prefs.remove(_storeScopedKey('customer_gender'));
       await prefs.setString(_storeScopedKey('customer_password'), password);
     } catch (e) {
       debugPrint("Failed to persist registration details locally: $e");
@@ -2240,10 +2233,10 @@ class AppState extends ChangeNotifier {
         await api.updateProfile(
           session: backendSession,
           name: name,
-          email: email,
+          email: '',
           phone: phone,
           dob: dob,
-          gender: gender,
+          gender: '',
           password: password,
         );
       } catch (e) {
@@ -2260,7 +2253,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> loginWithPassword({
-    required String identifier,
+    required String phone,
     required String password,
   }) async {
     if (!_isLiveBackendConnected) {
@@ -2270,7 +2263,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final session = await api.loginWithPassword(
-        identifier: identifier,
+        phone: phone,
         password: password,
       );
       _customerSession = session;
@@ -2278,11 +2271,11 @@ class AppState extends ChangeNotifier {
       await prefs.setInt(_storeScopedKey('customer_id'), session.customerId);
       await prefs.setString(
           _storeScopedKey('customer_token'), session.customerToken);
-      await prefs.setString(_storeScopedKey('customer_identifier'), identifier);
-      if (!identifier.contains("@")) {
-        profilePhone = identifier;
-        await prefs.setString(_storeScopedKey('customer_phone'), identifier);
-      }
+      await prefs.setString(_storeScopedKey('customer_identifier'), phone);
+      await prefs.remove(_storeScopedKey('customer_email'));
+      profileEmail = '';
+      profilePhone = phone;
+      await prefs.setString(_storeScopedKey('customer_phone'), phone);
       await prefs.setString(_storeScopedKey('customer_password'), password);
 
       await _restoreCart();

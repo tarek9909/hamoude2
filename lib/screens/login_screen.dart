@@ -50,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final appState = Provider.of<AppState>(context, listen: false);
-      await appState.loginWithPassword(identifier: phone, password: password);
+      await appState.loginWithPassword(phone: phone, password: password);
       if (mounted) {
         showTopToast(context, 'Welcome back to ${appState.appName}!');
       }
