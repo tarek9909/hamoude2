@@ -19,8 +19,8 @@ class SignUpScreen extends StatefulWidget {
 class _SignUpScreenState extends State<SignUpScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _dobController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordConfirmationController = TextEditingController();
 
   bool _isLoading = false;
   bool _agreedToPolicies = false;
@@ -29,24 +29,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _dobController.dispose();
     _passwordController.dispose();
+    _passwordConfirmationController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSignUp() async {
-    final name = _nameController.text.trim();
+    final name = _nameController.text;
     final phone = _phoneController.text.trim();
-    final dob = _dobController.text.trim();
     final password = _passwordController.text;
+    final passwordConfirmation = _passwordConfirmationController.text;
 
-    if (name.isEmpty || phone.isEmpty || dob.isEmpty || password.isEmpty) {
+    if (name.trim().isEmpty || phone.isEmpty || password.isEmpty) {
       showTopToast(context, 'Please fill out all required fields.');
+      return;
+    }
+
+    try {
+      normalizeFullName(name);
+    } on ArgumentError catch (error) {
+      showTopToast(context, error.message?.toString() ?? 'Enter a valid name.');
       return;
     }
 
     if (password.length < 8) {
       showTopToast(context, 'Password must be at least 8 characters long.');
+      return;
+    }
+    if (password != passwordConfirmation) {
+      showTopToast(context, 'Passwords do not match.');
       return;
     }
 
@@ -63,7 +74,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       await appState.registerWithPassword(
         name: name,
         phone: phone,
-        dob: dob,
         password: password,
       );
       if (mounted) {
@@ -316,45 +326,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     keyboardType: TextInputType.phone,
                                   ),
                                   const SizedBox(height: 20),
-                                  GestureDetector(
-                                    onTap: () async {
-                                      final date = await showDatePicker(
-                                        context: context,
-                                        initialDate: DateTime.now().subtract(
-                                            const Duration(days: 365 * 18)),
-                                        firstDate: DateTime(1900),
-                                        lastDate: DateTime.now(),
-                                        builder: (context, child) => Theme(
-                                          data: Theme.of(context).copyWith(
-                                            colorScheme: ColorScheme.light(
-                                              primary: AppTheme.primary,
-                                              onPrimary: Colors.white,
-                                              surface: Colors.white,
-                                              onSurface: AppTheme.primary,
-                                            ),
-                                          ),
-                                          child: child!,
-                                        ),
-                                      );
-                                      if (date != null) {
-                                        _dobController.text =
-                                            "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-                                      }
-                                    },
-                                    child: AbsorbPointer(
-                                      child: _buildTextField(
-                                        controller: _dobController,
-                                        labelText: 'DATE OF BIRTH',
-                                        hintText: 'Select Date of Birth',
-                                        prefixIcon:
-                                            Icons.calendar_today_outlined,
-                                      ),
-                                    ),
-                                  ),
                                   _buildTextField(
                                     controller: _passwordController,
                                     labelText: 'CREATE PASSWORD',
                                     hintText: 'Enter a secure password',
+                                    prefixIcon: Icons.lock_outline,
+                                    obscureText: true,
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildTextField(
+                                    controller: _passwordConfirmationController,
+                                    labelText: 'CONFIRM PASSWORD',
+                                    hintText: 'Re-enter your password',
                                     prefixIcon: Icons.lock_outline,
                                     obscureText: true,
                                   ),

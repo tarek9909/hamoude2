@@ -166,20 +166,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: AppTheme.primary,
                   ),
                 ),
-                const SizedBox(height: 4),
-                const SizedBox.shrink(),
-                const SizedBox(height: 10),
-                Text(
-                  appState.profileEmail,
-                  style: GoogleFonts.manrope(
-                    fontSize: 13,
-                    color: AppTheme.secondary.withValues(alpha: 0.8),
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.5,
-                  ),
-                ),
                 if (appState.profilePhone.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 10),
                   Text(
                     appState.profilePhone,
                     style: GoogleFonts.manrope(

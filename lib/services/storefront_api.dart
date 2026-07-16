@@ -273,6 +273,7 @@ class StorefrontApi {
       'preview_media_url',
       'logo_url',
       'primary_image_url',
+      'profile_image_url',
     };
 
     for (final key in mediaKeys) {
@@ -742,10 +743,6 @@ class StorefrontApi {
   Future<Map<String, dynamic>> updateProfile({
     required CustomerSession session,
     required String name,
-    required String email,
-    required String phone,
-    required String dob,
-    required String gender,
     String? password,
   }) async {
     final payload = await _request(
@@ -755,10 +752,6 @@ class StorefrontApi {
       body: {
         'customer_id': session.customerId,
         'full_name': name,
-        'email': email,
-        'phone': phone,
-        'date_of_birth': dob,
-        'gender': gender,
         if (password != null && password.isNotEmpty) 'password': password,
       },
     );
@@ -789,7 +782,6 @@ class StorefrontApi {
   Future<CustomerSession> registerWithPhonePassword({
     required String name,
     required String phone,
-    required String dob,
     required String password,
   }) async {
     final payload = await _request(
@@ -798,7 +790,6 @@ class StorefrontApi {
       body: {
         'full_name': name,
         'phone': phone,
-        'date_of_birth': dob,
         'password': password,
       },
     );
@@ -826,6 +817,39 @@ class StorefrontApi {
       session: session,
       body: {'customer_id': session.customerId},
     );
+  }
+
+  Future<Map<String, dynamic>> uploadProfileImage({
+    required CustomerSession session,
+    required String filePath,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/$storeSlug/me/profile-image'),
+    );
+    request.headers['x-customer-token'] = session.customerToken;
+    request.fields['customer_id'] = session.customerId.toString();
+    request.files.add(await http.MultipartFile.fromPath('image', filePath));
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw StorefrontApiException(
+        'Profile picture upload failed.',
+        statusCode: response.statusCode,
+      );
+    }
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  Future<Map<String, dynamic>> removeProfileImage(
+      CustomerSession session) async {
+    final payload = await _request(
+      'me/profile-image',
+      method: 'DELETE',
+      session: session,
+      body: {'customer_id': session.customerId},
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
   Future<List<Map<String, dynamic>>> listAddresses(

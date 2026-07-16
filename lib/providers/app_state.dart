@@ -1,9 +1,44 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/product.dart';
 import '../services/storefront_api.dart';
+
+String normalizeFullName(String value) {
+  final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (normalized.length < 2 || normalized.length > 150) {
+    throw ArgumentError('Enter a name between 2 and 150 characters.');
+  }
+  if (!RegExp(r"^[^0-9_!@#\$%^&*()+=\[\]{};:\\|,.<>/?`~]+$")
+      .hasMatch(normalized)) {
+    throw ArgumentError('Enter a valid name.');
+  }
+  return normalized;
+}
+
+String normalizePhoneNumber(String value) {
+  var normalized = value.trim().replaceAll(RegExp(r'[\s().-]'), '');
+  if (normalized.startsWith('00')) {
+    normalized = '+${normalized.substring(2)}';
+  }
+  if (!normalized.startsWith('+')) {
+    if (normalized.startsWith('961')) {
+      normalized = '+$normalized';
+    } else if (normalized.startsWith('0')) {
+      normalized = '+961${normalized.substring(1)}';
+    } else if (RegExp(r'^[378]\d{6,7}$').hasMatch(normalized)) {
+      normalized = '+961$normalized';
+    } else {
+      normalized = '+$normalized';
+    }
+  }
+  if (!RegExp(r'^\+\d{7,15}$').hasMatch(normalized)) {
+    throw ArgumentError('Enter a valid phone number.');
+  }
+  return normalized;
+}
 
 class TicketMessage {
   final String sender; // 'customer' or 'staff'
@@ -210,7 +245,9 @@ class AppState extends ChangeNotifier {
   bool get ordersEnabled => isFeatureEnabled('admin_orders_all');
   bool get checkoutEnabled => productsEnabled && ordersEnabled;
   bool get customersEnabled => isFeatureEnabled('admin_customers');
-  bool get profileEnabled => customersEnabled;
+  // The account tab must remain reachable for guests even if optional customer
+  // administration is disabled in the back office.
+  bool get profileEnabled => true;
   bool get supportEnabled => isFeatureEnabled('admin_support');
   bool get reviewsEnabled => isFeatureEnabled('admin_reviews');
   bool get marketingContentEnabled =>
@@ -236,7 +273,7 @@ class AppState extends ChangeNotifier {
       case 3:
         return ordersEnabled;
       case 4:
-        return profileEnabled;
+        return true;
       default:
         return false;
     }
@@ -273,12 +310,13 @@ class AppState extends ChangeNotifier {
   }
 
   // Profile Information
-  String profileName = "Store Customer";
+  String profileName = "";
+  @Deprecated('Email is not used in the customer storefront.')
   String profileEmail = "";
   String profilePhone = "";
   String profileSkinConcern = "All";
-  String profileDob = "";
-  String profileGender = "";
+  String profileDob = ""; // Legacy data; never displayed or submitted.
+  String profileGender = ""; // Legacy data; never displayed or submitted.
   String? profileImageUrl;
   String? _accountPassword;
   String? get accountPassword => _accountPassword;
@@ -1784,29 +1822,18 @@ class AppState extends ChangeNotifier {
       final tickets = results[4] as List<Map<String, dynamic>>;
 
       if (profileEnabled) {
-        final name = profile['full_name'] ??
-            profile['name'] ??
-            profile['customer_name'] ??
-            profile['email'];
+        final name =
+            profile['full_name'] ?? profile['name'] ?? profile['customer_name'];
         if (name != null && name.toString().trim().isNotEmpty) {
           profileName = name.toString();
         }
-        final email = profile['email'] ?? profile['identifier'];
-        if (email != null && email.toString().trim().isNotEmpty) {
-          profileEmail = email.toString();
-        }
-
         final phone = profile['phone'];
         if (phone != null) {
           profilePhone = phone.toString();
         }
-        final dob = profile['date_of_birth'] ?? profile['dob'];
-        if (dob != null) {
-          profileDob = dob.toString();
-        }
-        final gender = profile['gender'];
-        if (gender != null) {
-          profileGender = gender.toString();
+        final avatar = profile['profile_image_url'];
+        if (avatar != null && avatar.toString().trim().isNotEmpty) {
+          profileImageUrl = avatar.toString();
         }
 
         final prefs = await SharedPreferences.getInstance();
@@ -1814,23 +1841,13 @@ class AppState extends ChangeNotifier {
           await prefs.setString(
               _storeScopedKey('customer_name'), name.toString());
         }
-        if (email != null) {
-          await prefs.setString(
-              _storeScopedKey('customer_email'), email.toString());
-          await prefs.setString(
-              _storeScopedKey('customer_identifier'), email.toString());
-        }
         if (phone != null) {
           await prefs.setString(
               _storeScopedKey('customer_phone'), phone.toString());
         }
-        if (dob != null) {
+        if (profileImageUrl != null) {
           await prefs.setString(
-              _storeScopedKey('customer_dob'), dob.toString());
-        }
-        if (gender != null) {
-          await prefs.setString(
-              _storeScopedKey('customer_gender'), gender.toString());
+              _storeScopedKey('customer_profile_image'), profileImageUrl!);
         }
 
         final mappedAddresses = addresses
@@ -2024,18 +2041,21 @@ class AppState extends ChangeNotifier {
 
       profileName =
           prefs.getString(_storeScopedKey('customer_name')) ?? profileName;
-      profileEmail =
-          prefs.getString(_storeScopedKey('customer_email')) ?? profileEmail;
       profilePhone =
           prefs.getString(_storeScopedKey('customer_phone')) ?? profilePhone;
       profileSkinConcern =
           prefs.getString(_storeScopedKey('customer_skin_concern')) ??
               profileSkinConcern;
-      profileDob = prefs.getString(_storeScopedKey('customer_dob')) ?? "";
-      profileGender = prefs.getString(_storeScopedKey('customer_gender')) ?? "";
       profileImageUrl =
           prefs.getString(_storeScopedKey('customer_profile_image'));
-      _accountPassword = prefs.getString(_storeScopedKey('customer_password'));
+      profileEmail = '';
+      profileDob = '';
+      profileGender = '';
+      _accountPassword = null;
+      await prefs.remove(_storeScopedKey('customer_email'));
+      await prefs.remove(_storeScopedKey('customer_dob'));
+      await prefs.remove(_storeScopedKey('customer_gender'));
+      await prefs.remove(_storeScopedKey('customer_password'));
 
       await _restoreCart();
 
@@ -2065,63 +2085,31 @@ class AppState extends ChangeNotifier {
 
   Future<void> updateProfileData({
     required String name,
-    required String email,
-    required String phone,
-    required String skinConcern,
-    required String dob,
-    required String gender,
   }) async {
-    var nextName = name;
-    var nextEmail = email;
-    var nextPhone = phone;
-    var nextDob = dob;
-    var nextGender = gender;
+    final nextName = normalizeFullName(name);
 
     if (_isLiveBackendConnected && _customerSession != null) {
       try {
         final updatedProfile = await api.updateProfile(
           session: _customerSession!,
-          name: name,
-          email: email,
-          phone: phone,
-          dob: dob,
-          gender: gender,
+          name: nextName,
         );
-        nextName = (updatedProfile['full_name'] ??
+        profileName = (updatedProfile['full_name'] ??
                 updatedProfile['name'] ??
                 updatedProfile['customer_name'] ??
                 nextName)
             .toString();
-        nextEmail = (updatedProfile['email'] ?? nextEmail).toString();
-        nextPhone = (updatedProfile['phone'] ?? nextPhone).toString();
-        nextDob = (updatedProfile['date_of_birth'] ??
-                updatedProfile['dob'] ??
-                nextDob)
-            .toString();
-        nextGender = (updatedProfile['gender'] ?? nextGender).toString();
       } catch (e) {
         debugPrint("Failed to update profile on backend: $e");
         rethrow;
       }
     }
 
-    profileName = nextName;
-    profileEmail = nextEmail;
-    profilePhone = nextPhone;
-    profileSkinConcern = skinConcern;
-    profileDob = nextDob;
-    profileGender = nextGender;
+    profileName = profileName.isEmpty ? nextName : profileName;
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_storeScopedKey('customer_name'), nextName);
-      await prefs.setString(_storeScopedKey('customer_email'), nextEmail);
-      await prefs.setString(_storeScopedKey('customer_identifier'), nextEmail);
-      await prefs.setString(_storeScopedKey('customer_phone'), nextPhone);
-      await prefs.setString(
-          _storeScopedKey('customer_skin_concern'), skinConcern);
-      await prefs.setString(_storeScopedKey('customer_dob'), nextDob);
-      await prefs.setString(_storeScopedKey('customer_gender'), nextGender);
+      await prefs.setString(_storeScopedKey('customer_name'), profileName);
     } catch (e) {
       debugPrint("Failed to persist profile updates locally: $e");
     }
@@ -2129,15 +2117,47 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateProfileImage(String imageUrl) async {
-    profileImageUrl = imageUrl;
+  Future<void> uploadProfileImage(String imagePath) async {
+    final session = _customerSession;
+    if (session == null) {
+      throw StateError('Sign in to update your profile picture.');
+    }
+    final file = File(imagePath);
+    final extension = imagePath.split('.').last.toLowerCase();
+    const allowedExtensions = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
+    if (!allowedExtensions.contains(extension)) {
+      throw ArgumentError('Choose a JPEG, PNG, GIF, or WebP image.');
+    }
+    if (!await file.exists() || await file.length() > 5 * 1024 * 1024) {
+      throw ArgumentError('Choose an image smaller than 5 MB.');
+    }
+    final profile = await api.uploadProfileImage(
+      session: session,
+      filePath: imagePath,
+    );
+    final imageUrl = profile['profile_image_url']?.toString();
+    if (imageUrl == null || imageUrl.isEmpty) {
+      throw const StorefrontApiException(
+          'The profile picture could not be saved.');
+    }
+    profileImageUrl = api.resolveMediaUrl(imageUrl);
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-          _storeScopedKey('customer_profile_image'), imageUrl);
+          _storeScopedKey('customer_profile_image'), profileImageUrl!);
     } catch (e) {
       debugPrint("Failed to persist profile image locally: $e");
     }
+    notifyListeners();
+  }
+
+  Future<void> removeProfileImage() async {
+    final session = _customerSession;
+    if (session == null) return;
+    await api.removeProfileImage(session);
+    profileImageUrl = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storeScopedKey('customer_profile_image'));
     notifyListeners();
   }
 
@@ -2147,25 +2167,12 @@ class AppState extends ChangeNotifier {
         await api.updateProfile(
           session: _customerSession!,
           name: profileName,
-          email: profileEmail,
-          phone: profilePhone,
-          dob: profileDob,
-          gender: profileGender,
           password: newPassword,
         );
       } catch (e) {
         debugPrint("Failed to update password on backend: $e");
         rethrow;
       }
-    }
-
-    _accountPassword = newPassword;
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_storeScopedKey('customer_password'), newPassword);
-    } catch (e) {
-      debugPrint("Failed to persist password update locally: $e");
     }
 
     notifyListeners();
@@ -2175,11 +2182,11 @@ class AppState extends ChangeNotifier {
   Future<void> registerWithPassword({
     required String name,
     required String phone,
-    required String dob,
     required String password,
     CustomerSession? backendSession,
   }) async {
     CustomerSession? session = backendSession;
+    final normalizedPhone = normalizePhoneNumber(phone);
 
     if (!_isLiveBackendConnected && session == null) {
       throw const StorefrontApiException(
@@ -2189,9 +2196,8 @@ class AppState extends ChangeNotifier {
     if (session == null) {
       try {
         session = await api.registerWithPhonePassword(
-          name: name,
-          phone: phone,
-          dob: dob,
+          name: normalizeFullName(name),
+          phone: normalizedPhone,
           password: password,
         );
       } catch (e) {
@@ -2205,45 +2211,25 @@ class AppState extends ChangeNotifier {
       customerToken: session.customerToken,
     );
 
-    profileName = name;
+    profileName = normalizeFullName(name);
     profileEmail = '';
-    profilePhone = phone;
-    profileDob = dob;
-    profileGender = '';
-    _accountPassword = password;
+    profilePhone = normalizedPhone;
 
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_storeScopedKey('customer_id'), session.customerId);
       await prefs.setString(
           _storeScopedKey('customer_token'), session.customerToken);
-      await prefs.setString(_storeScopedKey('customer_identifier'), phone);
-      await prefs.setString(_storeScopedKey('customer_name'), name);
+      await prefs.setString(
+          _storeScopedKey('customer_identifier'), normalizedPhone);
+      await prefs.setString(_storeScopedKey('customer_name'), profileName);
       await prefs.remove(_storeScopedKey('customer_email'));
-      await prefs.setString(_storeScopedKey('customer_phone'), phone);
-      await prefs.setString(_storeScopedKey('customer_dob'), dob);
+      await prefs.setString(_storeScopedKey('customer_phone'), normalizedPhone);
+      await prefs.remove(_storeScopedKey('customer_dob'));
       await prefs.remove(_storeScopedKey('customer_gender'));
-      await prefs.setString(_storeScopedKey('customer_password'), password);
+      await prefs.remove(_storeScopedKey('customer_password'));
     } catch (e) {
       debugPrint("Failed to persist registration details locally: $e");
-    }
-
-    if (_isLiveBackendConnected && backendSession != null) {
-      try {
-        await api.updateProfile(
-          session: backendSession,
-          name: name,
-          email: '',
-          phone: phone,
-          dob: dob,
-          gender: '',
-          password: password,
-        );
-      } catch (e) {
-        debugPrint(
-            "Failed to sync customer details to backend on registration: $e");
-        rethrow;
-      }
     }
 
     await _restoreCart();
@@ -2262,8 +2248,9 @@ class AppState extends ChangeNotifier {
     }
 
     try {
+      final normalizedPhone = normalizePhoneNumber(phone);
       final session = await api.loginWithPassword(
-        phone: phone,
+        phone: normalizedPhone,
         password: password,
       );
       _customerSession = session;
@@ -2271,12 +2258,13 @@ class AppState extends ChangeNotifier {
       await prefs.setInt(_storeScopedKey('customer_id'), session.customerId);
       await prefs.setString(
           _storeScopedKey('customer_token'), session.customerToken);
-      await prefs.setString(_storeScopedKey('customer_identifier'), phone);
+      await prefs.setString(
+          _storeScopedKey('customer_identifier'), normalizedPhone);
       await prefs.remove(_storeScopedKey('customer_email'));
       profileEmail = '';
-      profilePhone = phone;
-      await prefs.setString(_storeScopedKey('customer_phone'), phone);
-      await prefs.setString(_storeScopedKey('customer_password'), password);
+      profilePhone = normalizedPhone;
+      await prefs.setString(_storeScopedKey('customer_phone'), normalizedPhone);
+      await prefs.remove(_storeScopedKey('customer_password'));
 
       await _restoreCart();
       await _restoreWishlist();

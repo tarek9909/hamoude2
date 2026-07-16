@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_state.dart';
-import 'screens/login_screen.dart';
 import 'screens/navigation_shell.dart';
 import 'services/storefront_api.dart';
 import 'theme/app_theme.dart';
@@ -187,10 +186,7 @@ class _AppSplashScreenState extends State<AppSplashScreen>
 class _AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
-    if (appState.isCustomerSignedIn) {
-      return const NavigationShell();
-    }
-    return const LoginScreen();
+    // Shopping is public. Account-only actions gate themselves when opened.
+    return const NavigationShell();
   }
 }

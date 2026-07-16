@@ -139,12 +139,11 @@ class FakeStorefrontApi extends StorefrontApi {
   Future<CustomerSession> registerWithPhonePassword({
     required String name,
     required String phone,
-    required String dob,
     required String password,
   }) async {
     lastRegisteredName = name;
     lastRegisteredPhone = phone;
-    lastRegisteredDob = dob;
+    lastRegisteredDob = null;
     lastRegisteredPassword = password;
     return const CustomerSession(customerId: 7, customerToken: 'token-7');
   }
@@ -163,20 +162,12 @@ class FakeStorefrontApi extends StorefrontApi {
   Future<Map<String, dynamic>> updateProfile({
     required CustomerSession session,
     required String name,
-    required String email,
-    required String phone,
-    required String dob,
-    required String gender,
     String? password,
   }) async {
     lastUpdatedProfilePassword = password;
     return {
       'id': session.customerId,
       'full_name': name,
-      'email': email,
-      'phone': phone,
-      'date_of_birth': dob,
-      'gender': gender,
     };
   }
 
@@ -688,6 +679,19 @@ const _stockedProduct = Product(
 );
 
 void main() {
+  test('full name normalization preserves valid display names', () {
+    expect(
+        normalizeFullName("  Dalia  O'Connor-Saleh  "), "Dalia O'Connor-Saleh");
+    expect(() => normalizeFullName('   '), throwsArgumentError);
+    expect(() => normalizeFullName('Dalia7'), throwsArgumentError);
+  });
+
+  test('phone normalization accepts Lebanese local and international formats',
+      () {
+    expect(normalizePhoneNumber('03 123 456'), '+9613123456');
+    expect(normalizePhoneNumber('+961 3 123 456'), '+9613123456');
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
@@ -722,18 +726,18 @@ void main() {
     await appState.registerWithPassword(
       name: 'Maya Customer',
       phone: '+96170000000',
-      dob: '1996-01-02',
       password: 'super-secure-password',
     );
 
     final prefs = await SharedPreferences.getInstance();
     expect(fakeApi.lastRegisteredName, 'Maya Customer');
     expect(fakeApi.lastRegisteredPhone, '+96170000000');
-    expect(fakeApi.lastRegisteredDob, '1996-01-02');
+    expect(fakeApi.lastRegisteredDob, isNull);
     expect(fakeApi.lastRegisteredPassword, 'super-secure-password');
     expect(prefs.getString('skin-cella_customer_identifier'), '+96170000000');
     expect(prefs.getString('skin-cella_customer_email'), isNull);
     expect(prefs.getString('skin-cella_customer_gender'), isNull);
+    expect(prefs.getString('skin-cella_customer_password'), isNull);
   });
 
   test('password login uses phone as identifier', () async {
@@ -767,7 +771,6 @@ void main() {
     await appState.registerWithPassword(
       name: 'Maya Customer',
       phone: '+96170000000',
-      dob: '1996-01-02',
       password: 'super-secure-password',
       backendSession: appState.customerSession,
     );
@@ -886,7 +889,6 @@ void main() {
       appState.registerWithPassword(
         name: 'Maya Customer',
         phone: '+96170000000',
-        dob: '1996-01-02',
         password: 'super-secure-password',
       ),
       throwsA(isA<StorefrontApiException>()),

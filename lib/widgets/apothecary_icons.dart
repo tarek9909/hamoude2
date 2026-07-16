@@ -122,7 +122,8 @@ class _ApothecaryTrashPainter extends CustomPainter {
     final h = size.height;
 
     // Draw lid bar
-    canvas.drawLine(Offset(w * 0.18, h * 0.28), Offset(w * 0.82, h * 0.28), paint);
+    canvas.drawLine(
+        Offset(w * 0.18, h * 0.28), Offset(w * 0.82, h * 0.28), paint);
 
     // Draw lid top handle
     final handle = Path()
@@ -143,8 +144,10 @@ class _ApothecaryTrashPainter extends CustomPainter {
     canvas.drawPath(body, paint);
 
     // Draw elegant vertical slot detail lines
-    canvas.drawLine(Offset(w * 0.42, h * 0.40), Offset(w * 0.44, h * 0.72), paint);
-    canvas.drawLine(Offset(w * 0.58, h * 0.40), Offset(w * 0.56, h * 0.72), paint);
+    canvas.drawLine(
+        Offset(w * 0.42, h * 0.40), Offset(w * 0.44, h * 0.72), paint);
+    canvas.drawLine(
+        Offset(w * 0.58, h * 0.40), Offset(w * 0.56, h * 0.72), paint);
   }
 
   @override
@@ -297,9 +300,11 @@ class _ApothecaryBoxPainter extends CustomPainter {
     canvas.drawPath(topFace, paint);
 
     // Front left face vertical edges
-    canvas.drawLine(Offset(w * 0.18, h * 0.32), Offset(w * 0.18, h * 0.72), paint);
+    canvas.drawLine(
+        Offset(w * 0.18, h * 0.32), Offset(w * 0.18, h * 0.72), paint);
     canvas.drawLine(Offset(cx, h * 0.48), Offset(cx, h * 0.88), paint);
-    canvas.drawLine(Offset(w * 0.82, h * 0.32), Offset(w * 0.82, h * 0.72), paint);
+    canvas.drawLine(
+        Offset(w * 0.82, h * 0.32), Offset(w * 0.82, h * 0.72), paint);
 
     // Bottom face boundaries
     final bottomEdges = Path()

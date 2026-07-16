@@ -83,7 +83,8 @@ void main() {
     expect(capturedBody?['items'].single['quantity'], 2);
   });
 
-  test('phone registration uses phone-only auth endpoint and payload', () async {
+  test('phone registration uses phone-only auth endpoint and payload',
+      () async {
     Uri? capturedUrl;
     Map<String, dynamic>? capturedBody;
     final api = StorefrontApi(
@@ -109,15 +110,14 @@ void main() {
     final session = await api.registerWithPhonePassword(
       name: 'Maya Customer',
       phone: '+96170000000',
-      dob: '1998-04-12',
       password: 'password123',
     );
 
-    expect(capturedUrl?.path, '/api/v1/storefront/skin-cella/auth/register-phone');
+    expect(
+        capturedUrl?.path, '/api/v1/storefront/skin-cella/auth/register-phone');
     expect(capturedBody, {
       'full_name': 'Maya Customer',
       'phone': '+96170000000',
-      'date_of_birth': '1998-04-12',
       'password': 'password123',
     });
     expect(session.customerId, 11);
