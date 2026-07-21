@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_toast.dart';
-import 'forgot_password_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -166,35 +165,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ForgotPasswordScreen(
-                                  identifier: appState.profilePhone.isNotEmpty
-                                      ? appState.profilePhone
-                                      : null,
-                                ),
-                              ),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            'Forgot Password?',
-                            style: GoogleFonts.manrope(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primary,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
+                      Text(
+                        'Forgot your password? Contact the store so an authorized staff member can reset it.',
+                        style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          color: AppTheme.secondary,
                         ),
                       ),
                       const SizedBox(height: 20),

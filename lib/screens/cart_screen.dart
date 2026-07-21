@@ -467,6 +467,14 @@ class CartScreen extends StatelessWidget {
                                             appState.wholesaleMinOrderAmount)
                                     ? null
                                     : () {
+                                        if (!appState.isCustomerSignedIn) {
+                                          showTopToast(
+                                            context,
+                                            'Sign in or create an account to continue to checkout.',
+                                          );
+                                          appState.setTabIndex(4);
+                                          return;
+                                        }
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(

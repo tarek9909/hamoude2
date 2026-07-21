@@ -15,24 +15,24 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
-    final phone = _phoneController.text.trim();
+    final username = _usernameController.text.trim();
     final password = _passwordController.text;
 
-    if (phone.isEmpty) {
-      showTopToast(context, 'Please enter your phone number.');
+    if (username.isEmpty) {
+      showTopToast(context, 'Please enter your username.');
       return;
     }
 
@@ -50,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final appState = Provider.of<AppState>(context, listen: false);
-      await appState.loginWithPassword(phone: phone, password: password);
+      await appState.loginWithPassword(username: username, password: password);
       if (mounted) {
         showTopToast(context, 'Welcome back to ${appState.appName}!');
       }
@@ -260,11 +260,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _buildTextField(
-                                    controller: _phoneController,
-                                    labelText: 'PHONE NUMBER',
-                                    hintText: 'e.g. +961 70 000 000',
-                                    prefixIcon: Icons.phone_outlined,
-                                    keyboardType: TextInputType.phone,
+                                    controller: _usernameController,
+                                    labelText: 'USERNAME',
+                                    hintText: 'Enter your username',
+                                    prefixIcon: Icons.alternate_email,
                                   ),
                                   const SizedBox(height: 20),
                                   _buildTextField(

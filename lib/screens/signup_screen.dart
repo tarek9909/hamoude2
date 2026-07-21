@@ -18,7 +18,7 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmationController = TextEditingController();
 
@@ -28,7 +28,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _phoneController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     _passwordConfirmationController.dispose();
     super.dispose();
@@ -36,17 +36,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _handleSignUp() async {
     final name = _nameController.text;
-    final phone = _phoneController.text.trim();
+    final username = _usernameController.text.trim();
     final password = _passwordController.text;
     final passwordConfirmation = _passwordConfirmationController.text;
 
-    if (name.trim().isEmpty || phone.isEmpty || password.isEmpty) {
+    if (name.trim().isEmpty || username.isEmpty || password.isEmpty) {
       showTopToast(context, 'Please fill out all required fields.');
       return;
     }
 
     try {
       normalizeFullName(name);
+      normalizeUsername(username);
     } on ArgumentError catch (error) {
       showTopToast(context, error.message?.toString() ?? 'Enter a valid name.');
       return;
@@ -73,7 +74,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final appState = Provider.of<AppState>(context, listen: false);
       await appState.registerWithPassword(
         name: name,
-        phone: phone,
+        username: username,
         password: password,
       );
       if (mounted) {
@@ -319,11 +320,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                   ),
                                   const SizedBox(height: 20),
                                   _buildTextField(
-                                    controller: _phoneController,
-                                    labelText: 'PHONE NUMBER',
-                                    hintText: 'e.g. +961 70 000 000',
-                                    prefixIcon: Icons.phone_outlined,
-                                    keyboardType: TextInputType.phone,
+                                    controller: _usernameController,
+                                    labelText: 'USERNAME',
+                                    hintText: 'e.g. hamoude.saleh',
+                                    prefixIcon: Icons.alternate_email,
                                   ),
                                   const SizedBox(height: 20),
                                   _buildTextField(

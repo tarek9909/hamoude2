@@ -759,15 +759,14 @@ class StorefrontApi {
   }
 
   Future<CustomerSession> loginWithPassword({
-    required String phone,
+    required String username,
     required String password,
   }) async {
     final payload = await _request(
       'auth/login',
       method: 'POST',
       body: {
-        'phone': phone,
-        'identifier': phone,
+        'username': username,
         'password': password,
       },
     );
@@ -779,18 +778,22 @@ class StorefrontApi {
     );
   }
 
-  Future<CustomerSession> registerWithPhonePassword({
+  Future<CustomerSession> registerWithUsernamePassword({
     required String name,
-    required String phone,
+    required String username,
     required String password,
   }) async {
     final payload = await _request(
-      'auth/register-phone',
+      'auth/register-username',
       method: 'POST',
       body: {
         'full_name': name,
-        'phone': phone,
+        'username': username,
         'password': password,
+        'policy_acceptance': {
+          'terms_accepted': true,
+          'privacy_accepted': true,
+        },
       },
     );
     final data = (payload['data'] as Map<String, dynamic>?) ?? {};

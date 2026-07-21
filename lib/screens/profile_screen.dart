@@ -166,10 +166,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: AppTheme.primary,
                   ),
                 ),
-                if (appState.profilePhone.isNotEmpty) ...[
+                if (appState.profileUsername.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
-                    appState.profilePhone,
+                    '@${appState.profileUsername}',
                     style: GoogleFonts.manrope(
                       fontSize: 12.5,
                       color: AppTheme.secondary.withValues(alpha: 0.65),

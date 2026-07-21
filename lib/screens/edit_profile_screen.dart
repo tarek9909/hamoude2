@@ -18,7 +18,6 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _picker = ImagePicker();
   bool _isSaving = false;
   bool _isPickingImage = false;
@@ -27,13 +26,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _nameController.text = context.read<AppState>().profileName;
-    _phoneController.text = context.read<AppState>().profilePhone;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -214,16 +211,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Full name',
                     prefixIcon: Icon(Icons.person_outline),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _phoneController,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone number',
-                    helperText: 'Used to sign in and cannot be changed here.',
-                    prefixIcon: Icon(Icons.phone_outlined),
                   ),
                 ),
                 const SizedBox(height: 28),

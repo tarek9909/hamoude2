@@ -18,24 +18,12 @@ String normalizeFullName(String value) {
   return normalized;
 }
 
-String normalizePhoneNumber(String value) {
-  var normalized = value.trim().replaceAll(RegExp(r'[\s().-]'), '');
-  if (normalized.startsWith('00')) {
-    normalized = '+${normalized.substring(2)}';
-  }
-  if (!normalized.startsWith('+')) {
-    if (normalized.startsWith('961')) {
-      normalized = '+$normalized';
-    } else if (normalized.startsWith('0')) {
-      normalized = '+961${normalized.substring(1)}';
-    } else if (RegExp(r'^[378]\d{6,7}$').hasMatch(normalized)) {
-      normalized = '+961$normalized';
-    } else {
-      normalized = '+$normalized';
-    }
-  }
-  if (!RegExp(r'^\+\d{7,15}$').hasMatch(normalized)) {
-    throw ArgumentError('Enter a valid phone number.');
+String normalizeUsername(String value) {
+  final normalized = value.trim().toLowerCase();
+  if (!RegExp(r'^[a-z0-9](?:[a-z0-9._-]{1,28}[a-z0-9])?$')
+      .hasMatch(normalized)) {
+    throw ArgumentError(
+        'Username must be 3-30 characters and use letters, numbers, dots, underscores, or hyphens.');
   }
   return normalized;
 }
@@ -311,6 +299,7 @@ class AppState extends ChangeNotifier {
 
   // Profile Information
   String profileName = "";
+  String profileUsername = "";
   @Deprecated('Email is not used in the customer storefront.')
   String profileEmail = "";
   String profilePhone = "";
@@ -1732,6 +1721,7 @@ class AppState extends ChangeNotifier {
     await prefs.remove(_storeScopedKey('customer_id'));
     await prefs.remove(_storeScopedKey('customer_token'));
     await prefs.remove(_storeScopedKey('customer_identifier'));
+    await prefs.remove(_storeScopedKey('customer_username'));
     await prefs.remove(_storeScopedKey('customer_email'));
     await prefs.remove(_storeScopedKey('customer_password'));
     await prefs.remove(_storeScopedKey('customer_dob'));
@@ -1744,6 +1734,7 @@ class AppState extends ChangeNotifier {
 
     // Reset profile fields
     profileName = "Store Customer";
+    profileUsername = "";
     profileEmail = "";
     profilePhone = "";
     profileSkinConcern = "All";
@@ -1827,6 +1818,10 @@ class AppState extends ChangeNotifier {
         if (name != null && name.toString().trim().isNotEmpty) {
           profileName = name.toString();
         }
+        final username = profile['username'];
+        if (username != null && username.toString().trim().isNotEmpty) {
+          profileUsername = username.toString();
+        }
         final phone = profile['phone'];
         if (phone != null) {
           profilePhone = phone.toString();
@@ -1840,6 +1835,12 @@ class AppState extends ChangeNotifier {
         if (name != null) {
           await prefs.setString(
               _storeScopedKey('customer_name'), name.toString());
+        }
+        if (profileUsername.isNotEmpty) {
+          await prefs.setString(
+              _storeScopedKey('customer_identifier'), profileUsername);
+          await prefs.setString(
+              _storeScopedKey('customer_username'), profileUsername);
         }
         if (phone != null) {
           await prefs.setString(
@@ -2043,6 +2044,8 @@ class AppState extends ChangeNotifier {
           prefs.getString(_storeScopedKey('customer_name')) ?? profileName;
       profilePhone =
           prefs.getString(_storeScopedKey('customer_phone')) ?? profilePhone;
+      profileUsername =
+          prefs.getString(_storeScopedKey('customer_username')) ?? '';
       profileSkinConcern =
           prefs.getString(_storeScopedKey('customer_skin_concern')) ??
               profileSkinConcern;
@@ -2069,10 +2072,8 @@ class AppState extends ChangeNotifier {
           customerId: customerId,
           customerToken: customerToken,
         );
-        if (identifier != null && identifier.contains("@")) {
-          profileEmail = identifier;
-        } else if (identifier != null && identifier.isNotEmpty) {
-          profilePhone = identifier;
+        if (identifier != null && identifier.isNotEmpty) {
+          profileUsername = identifier;
         }
         await _restoreWishlist();
         notifyListeners();
@@ -2181,12 +2182,12 @@ class AppState extends ChangeNotifier {
 
   Future<void> registerWithPassword({
     required String name,
-    required String phone,
+    required String username,
     required String password,
     CustomerSession? backendSession,
   }) async {
     CustomerSession? session = backendSession;
-    final normalizedPhone = normalizePhoneNumber(phone);
+    final normalizedUsername = normalizeUsername(username);
 
     if (!_isLiveBackendConnected && session == null) {
       throw const StorefrontApiException(
@@ -2195,13 +2196,13 @@ class AppState extends ChangeNotifier {
 
     if (session == null) {
       try {
-        session = await api.registerWithPhonePassword(
+        session = await api.registerWithUsernamePassword(
           name: normalizeFullName(name),
-          phone: normalizedPhone,
+          username: normalizedUsername,
           password: password,
         );
       } catch (e) {
-        debugPrint("Backend phone registration failed: $e");
+        debugPrint("Backend username registration failed: $e");
         rethrow;
       }
     }
@@ -2213,7 +2214,8 @@ class AppState extends ChangeNotifier {
 
     profileName = normalizeFullName(name);
     profileEmail = '';
-    profilePhone = normalizedPhone;
+    profilePhone = '';
+    profileUsername = normalizedUsername;
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -2221,10 +2223,12 @@ class AppState extends ChangeNotifier {
       await prefs.setString(
           _storeScopedKey('customer_token'), session.customerToken);
       await prefs.setString(
-          _storeScopedKey('customer_identifier'), normalizedPhone);
+          _storeScopedKey('customer_identifier'), normalizedUsername);
       await prefs.setString(_storeScopedKey('customer_name'), profileName);
+      await prefs.setString(
+          _storeScopedKey('customer_username'), normalizedUsername);
       await prefs.remove(_storeScopedKey('customer_email'));
-      await prefs.setString(_storeScopedKey('customer_phone'), normalizedPhone);
+      await prefs.remove(_storeScopedKey('customer_phone'));
       await prefs.remove(_storeScopedKey('customer_dob'));
       await prefs.remove(_storeScopedKey('customer_gender'));
       await prefs.remove(_storeScopedKey('customer_password'));
@@ -2239,7 +2243,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> loginWithPassword({
-    required String phone,
+    required String username,
     required String password,
   }) async {
     if (!_isLiveBackendConnected) {
@@ -2248,9 +2252,9 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final normalizedPhone = normalizePhoneNumber(phone);
+      final normalizedUsername = normalizeUsername(username);
       final session = await api.loginWithPassword(
-        phone: normalizedPhone,
+        username: normalizedUsername,
         password: password,
       );
       _customerSession = session;
@@ -2259,11 +2263,14 @@ class AppState extends ChangeNotifier {
       await prefs.setString(
           _storeScopedKey('customer_token'), session.customerToken);
       await prefs.setString(
-          _storeScopedKey('customer_identifier'), normalizedPhone);
+          _storeScopedKey('customer_identifier'), normalizedUsername);
       await prefs.remove(_storeScopedKey('customer_email'));
       profileEmail = '';
-      profilePhone = normalizedPhone;
-      await prefs.setString(_storeScopedKey('customer_phone'), normalizedPhone);
+      profilePhone = '';
+      profileUsername = normalizedUsername;
+      await prefs.setString(
+          _storeScopedKey('customer_username'), normalizedUsername);
+      await prefs.remove(_storeScopedKey('customer_phone'));
       await prefs.remove(_storeScopedKey('customer_password'));
 
       await _restoreCart();
