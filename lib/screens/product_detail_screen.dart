@@ -72,17 +72,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ProductVariant? selected;
     for (final variant in product.variants) {
       if (Product.compareIds(variant.id, currentId) &&
-          variant.stockQuantity > 0) {
+          (product.isPreorder || variant.stockQuantity > 0)) {
         selected = variant;
         break;
       }
     }
     selected ??= product.variants
-        .where((variant) => variant.isDefault && variant.stockQuantity > 0)
+        .where((variant) =>
+            variant.isDefault &&
+            (product.isPreorder || variant.stockQuantity > 0))
         .cast<ProductVariant?>()
         .firstWhere((variant) => variant != null, orElse: () => null);
     selected ??= product.variants
-        .where((variant) => variant.stockQuantity > 0)
+        .where((variant) => product.isPreorder || variant.stockQuantity > 0)
         .cast<ProductVariant?>()
         .firstWhere((variant) => variant != null, orElse: () => null);
     selected ??= product.variants
@@ -98,9 +100,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_selectedImageIndex >= images.length) {
       _selectedImageIndex = 0;
     }
-    final stock = selected.stockQuantity;
-    if (_quantity > stock) {
-      _quantity = stock > 0 ? stock : 1;
+    final maxQuantity = product.isPreorder
+        ? product.preorderMaxQuantity
+        : selected.stockQuantity;
+    if (maxQuantity != null && _quantity > maxQuantity) {
+      _quantity = maxQuantity > 0 ? maxQuantity : 1;
     }
   }
 
@@ -173,7 +177,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ..[code] = value;
     return product.variants.any(
       (variant) =>
-          variant.stockQuantity > 0 &&
+          (product.isPreorder || variant.stockQuantity > 0) &&
           _matchesOptions(variant, candidateOptions),
     );
   }
@@ -183,7 +187,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     Map<String, String> options,
   ) {
     for (final variant in product.variants) {
-      if (variant.stockQuantity > 0 && _matchesOptions(variant, options)) {
+      if ((product.isPreorder || variant.stockQuantity > 0) &&
+          _matchesOptions(variant, options)) {
         return variant;
       }
     }
@@ -205,8 +210,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ..addAll(options);
       _selectedVariant = variant;
       final stock = variant?.stockQuantity ?? product.stockQuantity;
-      if (_quantity > stock) {
-        _quantity = stock > 0 ? stock : 1;
+      final maxQuantity =
+          product.isPreorder ? product.preorderMaxQuantity : stock;
+      if (maxQuantity != null && _quantity > maxQuantity) {
+        _quantity = maxQuantity > 0 ? maxQuantity : 1;
       }
     });
     _focusVariantImage(product, variant);
@@ -346,8 +353,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             spacing: 8,
             runSpacing: 8,
             children: product.variants.map((variant) {
-              final selected = selectedVariant?.id == variant.id;
-              final available = variant.stockQuantity > 0;
+              final selected =
+                  Product.compareIds(selectedVariant?.id, variant.id);
+              final available = product.isPreorder || variant.stockQuantity > 0;
               return ChoiceChip(
                 showCheckmark: false,
                 label: Row(
@@ -368,10 +376,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           _selectedVariantOptions
                             ..clear()
                             ..addAll(_optionsForVariant(variant));
-                          if (_quantity > variant.stockQuantity) {
-                            _quantity = variant.stockQuantity > 0
-                                ? variant.stockQuantity
-                                : 1;
+                          final maxQuantity = product.isPreorder
+                              ? product.preorderMaxQuantity
+                              : variant.stockQuantity;
+                          if (maxQuantity != null && _quantity > maxQuantity) {
+                            _quantity = maxQuantity > 0 ? maxQuantity : 1;
                           }
                         });
                         _focusVariantImage(product, variant);
