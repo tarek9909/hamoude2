@@ -14,6 +14,8 @@ import 'catalog_screen.dart';
 import 'browse_collection_screen.dart';
 import 'offers_screen.dart';
 import 'notifications_screen.dart';
+import 'preorders_screen.dart';
+import '../widgets/product_card.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -92,6 +94,10 @@ class HomeScreen extends StatelessWidget {
                 return (category['name'] ?? '').isNotEmpty;
               }).toList()
             : [];
+
+    final preorderProducts =
+        appState.products.where((product) => product.isPreorder).toList();
+    final preorderCount = preorderProducts.length;
 
     // Build promotions list dynamically
     final List<Map<String, dynamic>> displayPromotionsData = [];
@@ -1005,6 +1011,80 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ],
+
+              if (preorderCount > 0) ...[
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 24),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Preorders',
+                              style: GoogleFonts.ebGaramond(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF070F0A),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PreordersScreen(),
+                                ),
+                              ),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: Color(0xFF070F0A),
+                                      width: 1,
+                                    ),
+                                  ),
+                                ),
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text(
+                                  'VIEW ALL',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.5,
+                                    color: const Color(0xFF070F0A),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 330,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: preorderProducts.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 16),
+                            itemBuilder: (context, index) => SizedBox(
+                              width: 210,
+                              child: ProductCard(
+                                product: preorderProducts[index],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

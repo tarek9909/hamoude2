@@ -57,16 +57,20 @@ class _ShopCatalogScreenState extends State<ShopCatalogScreen> {
     final List<Product> products;
     if (isBrandMode) {
       products = appState.products
+          .where((product) => !product.isPreorder)
           .where(
               (p) => p.brand.toLowerCase() == widget.brandFilter!.toLowerCase())
           .toList();
     } else if (isCategoryMode) {
       products = appState.products
+          .where((product) => !product.isPreorder)
           .where((p) =>
               p.category.toLowerCase() == widget.categoryFilter!.toLowerCase())
           .toList();
     } else {
-      var list = appState.filteredProducts;
+      var list = appState.filteredProducts
+          .where((product) => !product.isPreorder)
+          .toList();
       if (appState.brandsEnabled &&
           _selectedBrand != null &&
           _selectedBrand != 'All') {
