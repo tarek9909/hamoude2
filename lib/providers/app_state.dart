@@ -74,6 +74,8 @@ class AppOrder {
       status; // 'Pending', 'Confirmed', 'Preparing', 'Ready', 'Dispatched', 'Delivered'
   final DateTime createdAt;
   final String address;
+  final String fulfillmentMode;
+  final String preorderEtaText;
 
   AppOrder({
     required this.id,
@@ -86,6 +88,8 @@ class AppOrder {
     required this.status,
     required this.createdAt,
     required this.address,
+    this.fulfillmentMode = 'standard',
+    this.preorderEtaText = '',
   });
 }
 
@@ -597,7 +601,7 @@ class AppState extends ChangeNotifier {
     final existingIndex = _cart.indexWhere(
       (item) =>
           Product.compareIds(item.product.id, product.id) &&
-          item.variantId == variantId,
+          Product.compareIds(item.variantId, variantId),
     );
     return existingIndex >= 0 ? _cart[existingIndex].quantity : 0;
   }
@@ -608,9 +612,19 @@ class AppState extends ChangeNotifier {
       return false;
     }
     final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
-    if (stockQuantity <= 0 || quantity <= 0) {
+    if (quantity <= 0) {
       return false;
     }
+    if (_cart.isNotEmpty &&
+        _cart.any((item) => item.isPreorder != product.isPreorder)) {
+      return false;
+    }
+    if (product.isPreorder) {
+      final maxQuantity = product.preorderMaxQuantity;
+      return maxQuantity == null ||
+          cartQuantityFor(product, variant: variant) + quantity <= maxQuantity;
+    }
+    if (stockQuantity <= 0) return false;
     return cartQuantityFor(product, variant: variant) + quantity <=
         stockQuantity;
   }
@@ -623,7 +637,7 @@ class AppState extends ChangeNotifier {
     final existingIndex = _cart.indexWhere(
       (item) =>
           Product.compareIds(item.product.id, product.id) &&
-          item.variantId == variantId,
+          Product.compareIds(item.variantId, variantId),
     );
     if (existingIndex >= 0) {
       _cart[existingIndex].quantity += quantity;
@@ -641,7 +655,7 @@ class AppState extends ChangeNotifier {
     _cart.removeWhere(
       (item) =>
           Product.compareIds(item.product.id, product.id) &&
-          item.variantId == variantId,
+          Product.compareIds(item.variantId, variantId),
     );
     _saveCart();
     notifyListeners();
@@ -659,13 +673,17 @@ class AppState extends ChangeNotifier {
     final index = _cart.indexWhere(
       (item) =>
           Product.compareIds(item.product.id, product.id) &&
-          item.variantId == variantId,
+          Product.compareIds(item.variantId, variantId),
     );
     final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
     if (index >= 0) {
       if (quantity <= 0) {
         _cart.removeAt(index);
-      } else if (quantity > stockQuantity) {
+      } else if (!product.isPreorder && quantity > stockQuantity) {
+        return false;
+      } else if (product.isPreorder &&
+          product.preorderMaxQuantity != null &&
+          quantity > product.preorderMaxQuantity!) {
         return false;
       } else {
         _cart[index].quantity = quantity;
@@ -677,7 +695,12 @@ class AppState extends ChangeNotifier {
       if (product.variants.isNotEmpty && variant == null) {
         return false;
       }
-      if (quantity > stockQuantity) {
+      if (!product.isPreorder && quantity > stockQuantity) {
+        return false;
+      }
+      if (product.isPreorder &&
+          product.preorderMaxQuantity != null &&
+          quantity > product.preorderMaxQuantity!) {
         return false;
       }
       _cart.add(
@@ -861,6 +884,8 @@ class AppState extends ChangeNotifier {
         status: "Pending",
         createdAt: DateTime.now(),
         address: address,
+        fulfillmentMode: result['fulfillment_mode']?.toString() ?? 'standard',
+        preorderEtaText: result['preorder_eta_text']?.toString() ?? '',
       );
       _orders.insert(0, liveOrder);
       _cart.clear();
@@ -1367,7 +1392,7 @@ class AppState extends ChangeNotifier {
       ProductVariant? liveVariant;
       if (item.variantId.isNotEmpty) {
         for (final variant in liveProduct.variants) {
-          if (variant.id == item.variantId) {
+          if (Product.compareIds(variant.id, item.variantId)) {
             liveVariant = variant;
             break;
           }
@@ -1382,11 +1407,17 @@ class AppState extends ChangeNotifier {
       }
 
       final stock = liveVariant?.stockQuantity ?? liveProduct.stockQuantity;
-      if (stock <= 0) {
+      if (!liveProduct.isPreorder && stock <= 0) {
         changed = true;
         continue;
       }
-      final quantity = item.quantity > stock ? stock : item.quantity;
+      final quantity = liveProduct.isPreorder
+          ? (liveProduct.preorderMaxQuantity == null
+              ? item.quantity
+              : (item.quantity > liveProduct.preorderMaxQuantity!
+                  ? liveProduct.preorderMaxQuantity!
+                  : item.quantity))
+          : (item.quantity > stock ? stock : item.quantity);
       if (quantity != item.quantity ||
           liveProduct.id != item.product.id ||
           liveVariant?.id != item.variant?.id) {
@@ -2321,7 +2352,7 @@ class AppState extends ChangeNotifier {
           final variant = variantId.isEmpty
               ? null
               : product.variants
-                  .where((entry) => entry.id == variantId)
+                  .where((entry) => Product.compareIds(entry.id, variantId))
                   .cast<ProductVariant?>()
                   .firstWhere(
                     (entry) => entry != null,

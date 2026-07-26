@@ -52,7 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final appState = Provider.of<AppState>(context, listen: false);
       await appState.loginWithPassword(username: username, password: password);
       if (mounted) {
-        showTopToast(context, 'Welcome back to ${appState.appName}!');
+        // Login is opened from the Profile tab. Returning to that route lets
+        // its Provider listener render the signed-in profile immediately.
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {

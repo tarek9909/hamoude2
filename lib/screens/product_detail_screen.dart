@@ -71,7 +71,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final currentId = _selectedVariant?.id;
     ProductVariant? selected;
     for (final variant in product.variants) {
-      if (variant.id == currentId && variant.stockQuantity > 0) {
+      if (Product.compareIds(variant.id, currentId) &&
+          variant.stockQuantity > 0) {
         selected = variant;
         break;
       }
@@ -848,7 +849,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final product = _liveProduct ?? widget.product;
     final selectedVariant = _selectedVariant != null
         ? product.variants
-            .where((variant) => variant.id == _selectedVariant!.id)
+            .where((variant) =>
+                Product.compareIds(variant.id, _selectedVariant!.id))
             .cast<ProductVariant?>()
             .firstWhere((variant) => variant != null, orElse: () => null)
         : null;
@@ -870,7 +872,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         variantOptions.keys.every(
             (code) => _selectedVariantOptions[code]?.trim().isNotEmpty == true);
     final canAddSelected = canCheckout &&
-        selectedStock > 0 &&
+        (product.isPreorder || selectedStock > 0) &&
         (!requiresVariant ||
             (selectedVariant != null && hasSelectedRequiredOptions));
     final showWholesaleOriginal = discountedPrice == null &&
@@ -1633,12 +1635,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         icon:
                             Icon(Icons.add, size: 14, color: AppTheme.primary),
                         onPressed: () {
-                          if (_quantity < selectedStock) {
+                          if (product.isPreorder &&
+                              (product.preorderMaxQuantity == null ||
+                                  _quantity < product.preorderMaxQuantity!)) {
+                            setState(() => _quantity++);
+                          } else if (!product.isPreorder &&
+                              _quantity < selectedStock) {
                             setState(() => _quantity++);
                           } else {
                             showTopToast(
                               context,
-                              'Only $selectedStock items in stock.',
+                              product.isPreorder
+                                  ? 'Maximum ${product.preorderMaxQuantity} items per pre-order.'
+                                  : 'Only $selectedStock items in stock.',
                             );
                           }
                         },
@@ -1664,11 +1673,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             context,
                             added
                                 ? '$_quantity x $itemName added to bag'
-                                : 'Only $selectedStock items in stock.',
+                                : product.isPreorder
+                                    ? 'Pre-order items must be checked out separately.'
+                                    : 'Only $selectedStock items in stock.',
                           );
                         },
                         child: Text(
-                            'ADD TO BAG - \$${(displayPrice * _quantity).toStringAsFixed(2)}'),
+                            '${product.isPreorder ? 'PRE-ORDER — COD' : 'ADD TO BAG'} - \$${(displayPrice * _quantity).toStringAsFixed(2)}'),
                       )
                     : Container(
                         height: 50,

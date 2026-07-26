@@ -157,7 +157,7 @@ class ProductCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (availableStockQuantity > 0 &&
+                              if (!product.isPreorder && availableStockQuantity > 0 &&
                                 availableStockQuantity <= 3) ...[
                               const SizedBox(width: 6),
                               Container(
@@ -195,7 +195,7 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                       // Out of stock or low stock badge
-                      if (availableStockQuantity == 0)
+                        if (availableStockQuantity == 0 && !product.isPreorder)
                         Positioned.fill(
                           child: Container(
                             color: Colors.black.withValues(alpha: 0.35),
@@ -221,7 +221,7 @@ class ProductCard extends StatelessWidget {
                           ),
                         ),
                       // Add to Bag Button
-                      if (availableStockQuantity > 0)
+                        if (availableStockQuantity > 0 || product.isPreorder)
                         Positioned(
                           bottom: 10,
                           right: 10,

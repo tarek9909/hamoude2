@@ -132,7 +132,7 @@ class ProductVariant {
             .trim();
 
     return ProductVariant(
-      id: (json['id'] ?? json['variant_id'] ?? '').toString(),
+      id: (json['id'] ?? json['variant_id'] ?? '').toString().trim(),
       name: name,
       displayName: displayName.isNotEmpty ? displayName : name,
       sku: (json['sku'] ?? '').toString(),
@@ -196,6 +196,9 @@ class Product {
   final String unitLabel;
   final String productType;
   final String sellBy;
+  final String availabilityMode;
+  final String preorderEtaText;
+  final int? preorderMaxQuantity;
   final List<ProductAttribute> attributes;
   final List<ProductImage> images;
   final List<ProductVariant> variants;
@@ -214,6 +217,7 @@ class Product {
   }
 
   bool get isAvailable => availableStockQuantity > 0;
+  bool get isPreorder => availabilityMode == 'preorder';
 
   String get subtitle {
     final lowerName = name.toLowerCase();
@@ -279,6 +283,9 @@ class Product {
     this.unitLabel = '',
     this.productType = 'physical',
     this.sellBy = 'unit',
+    this.availabilityMode = 'in_stock',
+    this.preorderEtaText = '',
+    this.preorderMaxQuantity,
     this.attributes = const [],
     this.images = const [],
     this.variants = const [],
@@ -337,6 +344,11 @@ class Product {
       unitLabel: unitLabel,
       productType: json['product_type']?.toString() ?? 'physical',
       sellBy: json['sell_by']?.toString() ?? 'unit',
+      availabilityMode: json['availability_mode']?.toString() ?? 'in_stock',
+      preorderEtaText: json['preorder_eta_text']?.toString() ?? '',
+      preorderMaxQuantity: json['preorder_max_quantity'] == null
+          ? null
+          : _toDouble(json['preorder_max_quantity']).toInt(),
       attributes: attributeList,
       images: images.isNotEmpty
           ? images
@@ -379,6 +391,9 @@ class Product {
       'unit_label': unitLabel,
       'product_type': productType,
       'sell_by': sellBy,
+      'availability_mode': availabilityMode,
+      'preorder_eta_text': preorderEtaText,
+      'preorder_max_quantity': preorderMaxQuantity,
       'attributes': attributes.map((attribute) => attribute.toJson()).toList(),
       'images': images.map((image) => image.toJson()).toList(),
       'variants': variants.map((variant) => variant.toJson()).toList(),
@@ -664,7 +679,7 @@ class CartItem {
     this.quantity = 1,
   });
 
-  String get variantId => variant?.id ?? '';
+  String get variantId => variant?.id.trim() ?? '';
   String get cartKey => '${product.id}::$variantId';
   String get displayName => variant == null
       ? product.name
@@ -674,6 +689,7 @@ class CartItem {
       : product.imageUrl;
   String get sku => variant?.sku ?? '';
   int get stockQuantity => variant?.stockQuantity ?? product.stockQuantity;
+  bool get isPreorder => product.isPreorder;
   double get unitPrice => variant?.price ?? product.price;
   double get totalPrice => unitPrice * quantity;
 
@@ -703,15 +719,31 @@ class CartItem {
         'quantity': quantity,
       };
 
-  factory CartItem.fromJson(Map<String, dynamic> json) => CartItem(
-        product: Product.fromJson(json['product']),
-        variant: json['variant'] is Map
-            ? ProductVariant.fromJson(
-                Map<String, dynamic>.from(json['variant'] as Map),
-              )
-            : null,
-        quantity: json['quantity'] ?? 1,
-      );
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    final product =
+        Product.fromJson(Map<String, dynamic>.from(json['product'] as Map));
+    final savedVariant = json['variant'];
+    final savedVariantId = json['variant_id']?.toString().trim() ?? '';
+    ProductVariant? variant;
+
+    if (savedVariant is Map) {
+      variant =
+          ProductVariant.fromJson(Map<String, dynamic>.from(savedVariant));
+    } else if (savedVariantId.isNotEmpty) {
+      for (final candidate in product.variants) {
+        if (Product.compareIds(candidate.id, savedVariantId)) {
+          variant = candidate;
+          break;
+        }
+      }
+    }
+
+    return CartItem(
+      product: product,
+      variant: variant,
+      quantity: _toDouble(json['quantity']).toInt(),
+    );
+  }
 }
 
 bool _toBool(dynamic value) {
