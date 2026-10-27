@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
+import '../widgets/top_toast.dart';
 import 'home_screen.dart';
 import 'cart_screen.dart';
 import 'catalog_screen.dart';
@@ -81,6 +82,22 @@ class _NavigationShellState extends State<NavigationShell> {
     const ProfileScreen(),
   ];
 
+  bool _sessionNoticeScheduled = false;
+
+  void _maybeShowSessionNotice(AppState appState) {
+    final notice = appState.sessionNotice;
+    if (notice == null || notice.isEmpty || _sessionNoticeScheduled) return;
+    _sessionNoticeScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sessionNoticeScheduled = false;
+      if (!mounted) return;
+      final pending = appState.sessionNotice;
+      if (pending == null || pending.isEmpty) return;
+      appState.clearSessionNotice();
+      showTopToast(context, pending);
+    });
+  }
+
   Widget _buildTabItem({
     required int index,
     required IconData icon,
@@ -130,6 +147,7 @@ class _NavigationShellState extends State<NavigationShell> {
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
+    _maybeShowSessionNotice(appState);
     final cartCount = appState.cart.fold(0, (sum, item) => sum + item.quantity);
     final currentIndex = appState.isTabEnabled(appState.currentTabIndex)
         ? appState.currentTabIndex

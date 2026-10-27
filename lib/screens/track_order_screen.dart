@@ -391,8 +391,22 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   if (order.fulfillmentMode == 'preorder') ...[
                     const SizedBox(height: 10),
                     Text(
-                      'PRE-ORDER — Cash on delivery${order.preorderEtaText.isNotEmpty ? ': ${order.preorderEtaText}' : ''}',
-                      style: GoogleFonts.manrope(fontSize: 11, color: AppTheme.onPrimaryContainer, fontWeight: FontWeight.w700),
+                      'PRE-ORDER — Store pickup, pay on collection${order.preorderEtaText.isNotEmpty ? ': ${order.preorderEtaText}' : ''}',
+                      style: GoogleFonts.manrope(
+                          fontSize: 11,
+                          color: AppTheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                  if (order.splitFromOrderNumber.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'RECEIVED ITEM FROM PRE-ORDER #${order.splitFromOrderNumber}',
+                      style: GoogleFonts.manrope(
+                        fontSize: 11,
+                        color: AppTheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -627,7 +641,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            item.product.name,
+                            item.displayName,
                             style: GoogleFonts.ebGaramond(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
@@ -635,7 +649,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${item.quantity} x ${item.product.volume}',
+                            item.product.volume.trim().isEmpty
+                                ? 'Qty ${item.quantity}'
+                                : '${item.quantity} x ${item.product.volume}',
                             style: GoogleFonts.manrope(
                                 fontSize: 11, color: AppTheme.secondary),
                           ),

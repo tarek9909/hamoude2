@@ -16,11 +16,16 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _deliveryType = "Delivery"; // "Delivery" or "Pickup"
-  late String _selectedAddress;
+  // Display label of a real saved CustomerAddress (see addressForLabel).
+  // Null when the customer has no saved address yet.
+  String? _selectedAddress;
 
   // Pickup Scheduling state
   DateTime? _selectedPickupDate;
   String? _selectedPickupTimeSlot;
+
+  // Guards against double submit while the checkout request is in flight.
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -28,29 +33,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final appState = Provider.of<AppState>(context, listen: false);
     _selectedAddress = appState.savedAddresses.isNotEmpty
         ? appState.savedAddresses.first
-        : appState.selectedBranch;
+        : null;
 
-    // Set default selected date for pickup to today or first available open day
+    // Default pickup date: the first upcoming day that still has slots.
     _initializeDefaultPickupDate(appState);
   }
 
   void _initializeDefaultPickupDate(AppState appState) {
     final activeBranch = _getActiveBranch(appState);
     final now = DateTime.now();
+    _selectedPickupDate = null;
+    _selectedPickupTimeSlot = null;
     for (int i = 0; i < 7; i++) {
       final date = now.add(Duration(days: i));
-      if (!_isBranchClosedOnDate(activeBranch, date)) {
-        _selectedPickupDate = DateTime(date.year, date.month, date.day);
-
-        // Populate first available time slot
-        final slots =
-            _generateTimeSlotsForDate(activeBranch, _selectedPickupDate!);
-        if (slots.isNotEmpty) {
-          _selectedPickupTimeSlot = slots.first;
-        }
-        break;
-      }
+      if (_isBranchClosedOnDate(activeBranch, date)) continue;
+      final day = DateTime(date.year, date.month, date.day);
+      final slots = _generateTimeSlotsForDate(activeBranch, day);
+      if (slots.isEmpty) continue;
+      _selectedPickupDate = day;
+      _selectedPickupTimeSlot = slots.first;
+      break;
     }
+  }
+
+  bool _fulfillmentSyncScheduled = false;
+
+  /// Keeps AppState's quote fulfillment in step with what this screen shows,
+  /// so the cart quote is priced for delivery or pickup correctly.
+  void _syncFulfillmentType(AppState appState, String effectiveDeliveryType) {
+    final wanted = effectiveDeliveryType.toLowerCase();
+    if (appState.fulfillmentType == wanted || _fulfillmentSyncScheduled) {
+      return;
+    }
+    _fulfillmentSyncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fulfillmentSyncScheduled = false;
+      if (!mounted) return;
+      appState.setFulfillmentType(wanted);
+    });
+  }
+
+  static String _errorMessage(Object error) {
+    if (error is StorefrontApiException) return error.message;
+    if (error is StateError) return error.message;
+    return error.toString().replaceAll('Exception: ', '');
   }
 
   StorefrontBranch _getActiveBranch(AppState appState) {
@@ -239,17 +265,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       );
     }
-    final deliveryEnabled = appState.deliveryEnabled;
+    // Pre-orders are collected in store once the stock arrives: no delivery
+    // and no pickup slot until the store confirms it is ready.
+    final isPreorderCart = appState.cartHasPreorder;
+    // Delivery needs the feature, a non-preorder cart and at least one zone.
+    final deliveryUnavailableNoZones = appState.deliveryEnabled &&
+        !isPreorderCart &&
+        !appState.deliveryAvailable;
+    final deliveryEnabled = appState.deliveryEnabled &&
+        !isPreorderCart &&
+        appState.deliveryAvailable;
     final effectiveDeliveryType = deliveryEnabled ? _deliveryType : "Pickup";
+    final isDelivery = effectiveDeliveryType == "Delivery";
+
+    // Totals: prefer the backend quote (promotions, bundles, tax), fall back
+    // to local math while no quote is available.
+    final quote = appState.cartQuote;
+    final orderSubtotal = quote?.subtotal ?? appState.cartSubtotal;
+    final orderDiscount = quote?.discount ?? appState.cartDiscount;
+    final orderTax = quote?.tax ?? 0.0;
+    // Both are quote-aware in AppState (quote priced for fulfillmentType).
     final orderDeliveryFee = appState.cartDeliveryFeeFor(effectiveDeliveryType);
     final orderTotal = appState.cartTotalFor(effectiveDeliveryType);
+    _syncFulfillmentType(appState, effectiveDeliveryType);
+    final appliedLabels = (quote?.appliedLabels ?? const <String>[])
+        .where((label) => label.trim().isNotEmpty)
+        .toList();
 
-    final addressOptions = appState.savedAddresses.isNotEmpty
-        ? appState.savedAddresses
-        : [appState.selectedBranch];
-    if (!addressOptions.contains(_selectedAddress)) {
+    final addressOptions = appState.savedAddresses;
+    if (_selectedAddress != null &&
+        !addressOptions.contains(_selectedAddress)) {
+      _selectedAddress =
+          addressOptions.isNotEmpty ? addressOptions.first : null;
+    } else if (_selectedAddress == null && addressOptions.isNotEmpty) {
       _selectedAddress = addressOptions.first;
     }
+    final selectedCustomerAddress = _selectedAddress == null
+        ? null
+        : appState.addressForLabel(_selectedAddress!);
+    final missingDeliveryAddress =
+        isDelivery && selectedCustomerAddress == null;
+
+    final deliveryZones = appState.deliveryZones;
+    final selectedZoneId = appState.selectedDeliveryZoneId;
 
     final activeBranch = _getActiveBranch(appState);
 
@@ -325,7 +383,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ],
                             ),
                             Text(
-                              '\$${appState.cartSubtotal.toStringAsFixed(2)}',
+                              '\$${orderSubtotal.toStringAsFixed(2)}',
                               style: GoogleFonts.manrope(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
@@ -348,11 +406,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             itemCount: appState.cart.length,
                             itemBuilder: (context, index) {
                               final item = appState.cart[index];
-                              final showRetailPrice =
-                                  appState.isWholesaleMode &&
-                                      item.product.retailPrice != null &&
-                                      item.product.retailPrice! >
-                                          item.product.price;
+                              final showRetailPrice = appState
+                                      .isWholesaleMode &&
+                                  item.product.retailPrice != null &&
+                                  item.product.retailPrice! > item.unitPrice;
+                              final itemName = item.displayName;
                               return Container(
                                 margin: const EdgeInsets.only(right: 12),
                                 padding: const EdgeInsets.symmetric(
@@ -370,8 +428,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
                                       child: Image.network(
-                                        appState.api.resolveMediaUrl(
-                                            item.product.imageUrl),
+                                        appState.api
+                                            .resolveMediaUrl(item.imageUrl),
                                         width: 44,
                                         height: 44,
                                         fit: BoxFit.cover,
@@ -393,9 +451,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                           MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          item.product.name.length > 20
-                                              ? '${item.product.name.substring(0, 18)}...'
-                                              : item.product.name,
+                                          itemName.length > 20
+                                              ? '${itemName.substring(0, 18)}...'
+                                              : itemName,
                                           style: GoogleFonts.manrope(
                                             fontSize: 11.5,
                                             fontWeight: FontWeight.bold,
@@ -425,7 +483,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                 ),
                                               TextSpan(
                                                 text:
-                                                    '\$${item.product.price.toStringAsFixed(2)}',
+                                                    '\$${item.unitPrice.toStringAsFixed(2)}',
                                               ),
                                             ],
                                           ),
@@ -559,10 +617,77 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ],
                   ),
 
+                  if (deliveryUnavailableNoZones) ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        'Delivery is not available from this branch yet. Please choose pickup.',
+                        style: GoogleFonts.manrope(
+                            fontSize: 11,
+                            color: AppTheme.secondary,
+                            fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 32),
 
                   // 3. Dynamic Section: Address Selector (Courier) vs Branch hours picker (Bespoke Pickup)
                   if (effectiveDeliveryType == "Delivery") ...[
+                    if (deliveryZones.length > 1) ...[
+                      Text(
+                        'DELIVERY ZONE',
+                        style: GoogleFonts.manrope(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.secondary,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: deliveryZones.map<Widget>((zone) {
+                          final zoneId = zone.id;
+                          final isSelected = zoneId == selectedZoneId;
+                          return GestureDetector(
+                            onTap: () => appState.selectDeliveryZone(zoneId),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppTheme.primary
+                                      : const Color(0xFFE5E7E2),
+                                  width: isSelected ? 1.2 : 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                zone.name.isNotEmpty
+                                    ? zone.name
+                                    : 'Zone ${zone.id}',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppTheme.primary,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -593,8 +718,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     const SizedBox(height: 12),
                     GestureDetector(
-                      onTap: () =>
-                          _showAddressSelectorBottomSheet(context, appState),
+                      onTap: () => addressOptions.isEmpty
+                          ? _showAddressBottomSheet(context, appState)
+                          : _showAddressSelectorBottomSheet(context, appState),
                       child: Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
@@ -634,11 +760,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        _selectedAddress,
+                                        selectedCustomerAddress?.displayLabel ??
+                                            'Add a delivery address to continue',
                                         style: GoogleFonts.manrope(
                                           fontSize: 13.5,
                                           fontWeight: FontWeight.w600,
-                                          color: AppTheme.primary,
+                                          color: selectedCustomerAddress == null
+                                              ? const Color(0xFFBA1A1A)
+                                              : AppTheme.primary,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
@@ -651,7 +780,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                     color: AppTheme.secondary, size: 20),
                               ],
                             ),
-                            if (appState.customerAddresses.isNotEmpty) ...[
+                            if (selectedCustomerAddress != null) ...[
                               const SizedBox(height: 12),
                               const Divider(
                                   height: 1,
@@ -694,14 +823,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       final address =
                                           _selectedCustomerAddress(appState);
                                       if (address == null) return;
-                                      await appState
-                                          .deleteCustomerAddress(address);
+                                      try {
+                                        await appState
+                                            .deleteCustomerAddress(address);
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          showTopToast(context,
+                                              'Could not delete address: ${_errorMessage(e)}');
+                                        }
+                                        return;
+                                      }
                                       if (mounted) {
                                         setState(() {
                                           _selectedAddress = appState
                                                   .savedAddresses.isNotEmpty
                                               ? appState.savedAddresses.first
-                                              : appState.selectedBranch;
+                                              : null;
                                         });
                                       }
                                     },
@@ -828,245 +965,254 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Pickup Scheduler Component
-                    Text(
-                      'CHOOSE PICKUP SCHEDULE',
-                      style: GoogleFonts.manrope(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.secondary,
-                        letterSpacing: 1.5,
+                    // Pickup Scheduler Component (in-stock orders only)
+                    if (isPreorderCart)
+                      _buildPreorderPickupNotice(appState)
+                    else ...[
+                      Text(
+                        'CHOOSE PICKUP SCHEDULE',
+                        style: GoogleFonts.manrope(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.secondary,
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.border, width: 0.8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withValues(alpha: 0.02),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Select Date',
-                            style: GoogleFonts.manrope(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: AppTheme.primary,
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border:
+                              Border.all(color: AppTheme.border, width: 0.8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primary.withValues(alpha: 0.02),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            height: 72,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              itemCount: 7,
-                              itemBuilder: (ctx, idx) {
-                                final now = DateTime.now();
-                                final date = now.add(Duration(days: idx));
-                                final formattedDate =
-                                    DateTime(date.year, date.month, date.day);
-                                final isClosed =
-                                    _isBranchClosedOnDate(activeBranch, date);
-                                final isSelected =
-                                    _selectedPickupDate == formattedDate;
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Select Date',
+                              style: GoogleFonts.manrope(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 72,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: 7,
+                                itemBuilder: (ctx, idx) {
+                                  final now = DateTime.now();
+                                  final date = now.add(Duration(days: idx));
+                                  final formattedDate =
+                                      DateTime(date.year, date.month, date.day);
+                                  final isClosed =
+                                      _isBranchClosedOnDate(activeBranch, date);
+                                  final isSelected =
+                                      _selectedPickupDate == formattedDate;
 
-                                return Padding(
-                                  padding: const EdgeInsets.only(
-                                      right: 10, bottom: 4),
-                                  child: GestureDetector(
-                                    onTap: isClosed
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _selectedPickupDate =
-                                                  formattedDate;
-                                              final slots =
-                                                  _generateTimeSlotsForDate(
-                                                      activeBranch,
-                                                      formattedDate);
-                                              if (slots.isNotEmpty) {
-                                                _selectedPickupTimeSlot =
-                                                    slots.first;
-                                              } else {
-                                                _selectedPickupTimeSlot = null;
-                                              }
-                                            });
-                                          },
-                                    child: AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 200),
-                                      width: 64,
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? AppTheme.primary
-                                            : isClosed
-                                                ? const Color(0xFFF3F4F1)
-                                                : Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                        right: 10, bottom: 4),
+                                    child: GestureDetector(
+                                      onTap: isClosed
+                                          ? null
+                                          : () {
+                                              setState(() {
+                                                _selectedPickupDate =
+                                                    formattedDate;
+                                                final slots =
+                                                    _generateTimeSlotsForDate(
+                                                        activeBranch,
+                                                        formattedDate);
+                                                if (slots.isNotEmpty) {
+                                                  _selectedPickupTimeSlot =
+                                                      slots.first;
+                                                } else {
+                                                  _selectedPickupTimeSlot =
+                                                      null;
+                                                }
+                                              });
+                                            },
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        width: 64,
+                                        decoration: BoxDecoration(
                                           color: isSelected
                                               ? AppTheme.primary
-                                              : const Color(0xFFE5E7E2),
-                                          width: isSelected ? 1.5 : 0.8,
-                                        ),
-                                        boxShadow: [
-                                          if (isSelected)
-                                            BoxShadow(
-                                              color: AppTheme.primary
-                                                  .withValues(alpha: 0.15),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                        ],
-                                      ),
-                                      child: Opacity(
-                                        opacity: isClosed ? 0.4 : 1.0,
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              _getWeekdayLabel(date.weekday),
-                                              style: GoogleFonts.manrope(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSelected
-                                                    ? Colors.white70
-                                                    : AppTheme.secondary,
+                                              : isClosed
+                                                  ? const Color(0xFFF3F4F1)
+                                                  : Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? AppTheme.primary
+                                                : const Color(0xFFE5E7E2),
+                                            width: isSelected ? 1.5 : 0.8,
+                                          ),
+                                          boxShadow: [
+                                            if (isSelected)
+                                              BoxShadow(
+                                                color: AppTheme.primary
+                                                    .withValues(alpha: 0.15),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 3),
                                               ),
-                                            ),
-                                            const SizedBox(height: 3),
-                                            Text(
-                                              date.day.toString(),
-                                              style: GoogleFonts.manrope(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w800,
-                                                color: isSelected
-                                                    ? Colors.white
-                                                    : AppTheme.primary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 1),
-                                            Text(
-                                              isClosed
-                                                  ? 'Closed'
-                                                  : _getMonthLabel(date.month),
-                                              style: GoogleFonts.manrope(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.bold,
-                                                color: isSelected
-                                                    ? Colors.white70
-                                                    : AppTheme.secondary,
-                                              ),
-                                            ),
                                           ],
                                         ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Select Time Window',
-                            style: GoogleFonts.manrope(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: AppTheme.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          if (_selectedPickupDate == null)
-                            Center(
-                              child: Text(
-                                'Select a pickup date first.',
-                                style: GoogleFonts.manrope(
-                                    fontSize: 12, color: AppTheme.secondary),
-                              ),
-                            )
-                          else ...[
-                            (() {
-                              final slots = _generateTimeSlotsForDate(
-                                  activeBranch, _selectedPickupDate!);
-                              if (slots.isEmpty) {
-                                return Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(16),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFAFBF9),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    'No pickup slots available for this day.',
-                                    style: GoogleFonts.manrope(
-                                        fontSize: 12,
-                                        color: AppTheme.secondary,
-                                        fontStyle: FontStyle.italic),
-                                  ),
-                                );
-                              }
-                              return Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: slots.map((slot) {
-                                  final isSelected =
-                                      _selectedPickupTimeSlot == slot;
-                                  return GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _selectedPickupTimeSlot = slot;
-                                      });
-                                    },
-                                    child: AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 150),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? AppTheme.primary
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? AppTheme.primary
-                                              : const Color(0xFFE5E7E2),
-                                          width: isSelected ? 1.2 : 0.8,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        slot,
-                                        style: GoogleFonts.manrope(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected
-                                              ? Colors.white
-                                              : AppTheme.primary,
+                                        child: Opacity(
+                                          opacity: isClosed ? 0.4 : 1.0,
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                _getWeekdayLabel(date.weekday),
+                                                style: GoogleFonts.manrope(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isSelected
+                                                      ? Colors.white70
+                                                      : AppTheme.secondary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                date.day.toString(),
+                                                style: GoogleFonts.manrope(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: isSelected
+                                                      ? Colors.white
+                                                      : AppTheme.primary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 1),
+                                              Text(
+                                                isClosed
+                                                    ? 'Closed'
+                                                    : _getMonthLabel(
+                                                        date.month),
+                                                style: GoogleFonts.manrope(
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isSelected
+                                                      ? Colors.white70
+                                                      : AppTheme.secondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   );
-                                }).toList(),
-                              );
-                            }()),
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Select Time Window',
+                              style: GoogleFonts.manrope(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (_selectedPickupDate == null)
+                              Center(
+                                child: Text(
+                                  'Select a pickup date first.',
+                                  style: GoogleFonts.manrope(
+                                      fontSize: 12, color: AppTheme.secondary),
+                                ),
+                              )
+                            else ...[
+                              (() {
+                                final slots = _generateTimeSlotsForDate(
+                                    activeBranch, _selectedPickupDate!);
+                                if (slots.isEmpty) {
+                                  return Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFAFBF9),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'No pickup slots available for this day.',
+                                      style: GoogleFonts.manrope(
+                                          fontSize: 12,
+                                          color: AppTheme.secondary,
+                                          fontStyle: FontStyle.italic),
+                                    ),
+                                  );
+                                }
+                                return Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: slots.map((slot) {
+                                    final isSelected =
+                                        _selectedPickupTimeSlot == slot;
+                                    return GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedPickupTimeSlot = slot;
+                                        });
+                                      },
+                                      child: AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 150),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 14, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? AppTheme.primary
+                                              : Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? AppTheme.primary
+                                                : const Color(0xFFE5E7E2),
+                                            width: isSelected ? 1.2 : 0.8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          slot,
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: isSelected
+                                                ? Colors.white
+                                                : AppTheme.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                );
+                              }()),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
 
                   const SizedBox(height: 32),
@@ -1114,7 +1260,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Cash on Delivery / Collection',
+                                isPreorderCart
+                                    ? 'Pay on Collection'
+                                    : 'Cash on Delivery / Collection',
                                 style: GoogleFonts.manrope(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
@@ -1123,9 +1271,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                effectiveDeliveryType == "Delivery"
-                                    ? 'Pay in cash directly to our courier agent upon shipment arrival.'
-                                    : 'Pay in cash when you arrive at our boutique to collect your orders.',
+                                isPreorderCart
+                                    ? 'Nothing to pay now. Pay in store when you collect your pre-order.'
+                                    : effectiveDeliveryType == "Delivery"
+                                        ? 'Pay in cash directly to our courier agent upon shipment arrival.'
+                                        : 'Pay in cash when you arrive at our boutique to collect your orders.',
                                 style: GoogleFonts.manrope(
                                   fontSize: 12,
                                   color: AppTheme.secondary,
@@ -1170,10 +1320,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       children: [
                         _buildBillingRow(
                           label: 'Subtotal',
-                          value:
-                              '\$${appState.cartSubtotal.toStringAsFixed(2)}',
+                          value: '\$${orderSubtotal.toStringAsFixed(2)}',
                         ),
                         const SizedBox(height: 12),
+                        if (orderDiscount > 0) ...[
+                          _buildBillingRow(
+                            label: appliedLabels.isEmpty
+                                ? 'Discount'
+                                : 'Discount (${appliedLabels.join(', ')})',
+                            value: '-\$${orderDiscount.toStringAsFixed(2)}',
+                            isHighlight: true,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         if (effectiveDeliveryType == "Delivery") ...[
                           _buildBillingRow(
                             label: 'Courier Delivery Fee',
@@ -1189,6 +1348,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             isHighlight: true,
                           ),
                         ],
+                        if (orderTax > 0) ...[
+                          const SizedBox(height: 12),
+                          _buildBillingRow(
+                            label: 'Tax',
+                            value: '\$${orderTax.toStringAsFixed(2)}',
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         const Divider(
                             height: 1,
@@ -1198,14 +1364,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'TOTAL DUE',
-                              style: GoogleFonts.manrope(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
-                                color: AppTheme.primary,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'TOTAL DUE',
+                                  style: GoogleFonts.manrope(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.0,
+                                    color: AppTheme.primary,
+                                  ),
+                                ),
+                                if (appState.isQuotingCart) ...[
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.5,
+                                      color: AppTheme.secondary,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             Text(
                               '\$${orderTotal.toStringAsFixed(2)}',
@@ -1234,45 +1416,79 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                       ),
                       onPressed: (appState.isCheckingOut ||
+                              _isSubmitting ||
+                              appState.cart.isEmpty ||
+                              missingDeliveryAddress ||
                               (effectiveDeliveryType == "Pickup" &&
+                                  !isPreorderCart &&
                                   _selectedPickupTimeSlot == null))
                           ? null
                           : () async {
-                              final dest = effectiveDeliveryType == "Delivery"
-                                  ? _selectedAddress
+                              if (_isSubmitting) return;
+                              if (appState.cart.isEmpty) {
+                                showTopToast(context, 'Your bag is empty.');
+                                return;
+                              }
+                              final deliveryAddress = isDelivery &&
+                                      _selectedAddress != null
+                                  ? appState.addressForLabel(_selectedAddress!)
+                                  : null;
+                              if (isDelivery && deliveryAddress == null) {
+                                showTopToast(context,
+                                    'Please add a delivery address first.');
+                                return;
+                              }
+                              final dest = isDelivery
+                                  ? deliveryAddress!.displayLabel
                                   : appState.selectedBranch;
 
                               String? formattedPickupTime;
                               if (effectiveDeliveryType == "Pickup" &&
-                                  _selectedPickupDate != null &&
-                                  _selectedPickupTimeSlot != null) {
+                                  !isPreorderCart) {
+                                // Re-validate the slot: it may have passed
+                                // while the screen was open.
+                                final date = _selectedPickupDate;
+                                final slot = _selectedPickupTimeSlot;
+                                final stillValid = date != null &&
+                                    slot != null &&
+                                    _generateTimeSlotsForDate(
+                                            _getActiveBranch(appState), date)
+                                        .contains(slot);
+                                if (!stillValid) {
+                                  setState(() =>
+                                      _initializeDefaultPickupDate(appState));
+                                  showTopToast(context,
+                                      'That pickup time is no longer available. Please choose another slot.');
+                                  return;
+                                }
                                 final dateStr =
-                                    "${_selectedPickupDate!.year}-${_selectedPickupDate!.month.toString().padLeft(2, '0')}-${_selectedPickupDate!.day.toString().padLeft(2, '0')}";
-                                formattedPickupTime =
-                                    "$dateStr at $_selectedPickupTimeSlot";
+                                    "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                                formattedPickupTime = "$dateStr at $slot";
                               }
 
+                              setState(() => _isSubmitting = true);
                               try {
+                                // checkout() returns the order or throws.
                                 final order = await appState.checkout(
                                   effectiveDeliveryType,
                                   dest,
                                   pickupTime: formattedPickupTime,
                                 );
                                 if (!context.mounted) return;
-                                _showSuccessDialog(
-                                    context, order?.id ?? "SC-8921");
+                                _showSuccessDialog(context, order.id);
                               } catch (e) {
                                 if (!context.mounted) return;
-                                showTopToast(
-                                  context,
-                                  e.toString().replaceAll('Exception: ', ''),
-                                );
+                                showTopToast(context, _errorMessage(e));
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isSubmitting = false);
+                                }
                               }
                             },
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (appState.isCheckingOut) ...[
+                          if (appState.isCheckingOut || _isSubmitting) ...[
                             const SizedBox(
                               width: 18,
                               height: 18,
@@ -1289,7 +1505,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             const SizedBox(width: 8),
                           ],
                           Text(
-                            appState.isCheckingOut
+                            appState.isCheckingOut || _isSubmitting
                                 ? 'PLACING ORDER...'
                                 : 'PLACE ORDER - \$${orderTotal.toStringAsFixed(2)}',
                             style: GoogleFonts.manrope(
@@ -1304,6 +1520,52 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreorderPickupNotice(AppState appState) {
+    final etaText = appState.cart
+        .map((item) => item.product.preorderEtaText)
+        .firstWhere((text) => text.isNotEmpty, orElse: () => '');
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border, width: 0.8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.schedule_outlined, color: AppTheme.primary, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PRE-ORDER · STORE PICKUP ONLY',
+                  style: GoogleFonts.manrope(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                    color: AppTheme.secondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "We'll notify you as soon as your items arrive and are ready to collect${etaText.isNotEmpty ? ' ($etaText)' : ''}. No delivery or pickup slot is needed now.",
+                  style: GoogleFonts.manrope(
+                    fontSize: 12.5,
+                    color: AppTheme.primary,
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1459,6 +1721,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // widget's state, so there's no risk of calling setState on a disposed
         // element after Navigator.pop removes the sheet from the tree.
         bool submitting = false;
+        String? formError;
 
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
@@ -1514,6 +1777,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         'Address Line 2 (Apartment, Suite - Optional)'),
                     _addressField(cityController, 'City'),
                     _addressField(stateController, 'State / Region'),
+                    if (formError != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        formError!,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFBA1A1A),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -1547,21 +1822,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             onPressed: submitting
                                 ? null
                                 : () async {
-                                    if (line1Controller.text.trim().isEmpty) {
-                                      showTopToast(
-                                        context,
-                                        'Address line 1 is required.',
-                                      );
+                                    final validationError =
+                                        _validateAddressForm(
+                                      name: nameController.text,
+                                      phone: phoneController.text,
+                                      line1: line1Controller.text,
+                                      city: cityController.text,
+                                    );
+                                    if (validationError != null) {
+                                      setSheetState(
+                                          () => formError = validationError);
                                       return;
                                     }
-                                    if (nameController.text.trim().isEmpty) {
-                                      showTopToast(
-                                        context,
-                                        'Recipient name is required.',
-                                      );
-                                      return;
-                                    }
-                                    setSheetState(() => submitting = true);
+                                    setSheetState(() {
+                                      formError = null;
+                                      submitting = true;
+                                    });
                                     try {
                                       final address = CustomerAddress(
                                         id: existing?.id ?? '',
@@ -1589,18 +1865,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       if (sheetContext.mounted) {
                                         Navigator.pop(sheetContext);
                                       }
-                                      await appState
-                                          .saveCustomerAddress(address);
+                                      final CustomerAddress saved =
+                                          await appState
+                                              .saveCustomerAddress(address);
                                       if (!mounted) return;
                                       setState(() {
-                                        _selectedAddress =
-                                            appState.savedAddresses.last;
+                                        _selectedAddress = saved.displayLabel;
                                       });
                                     } catch (e) {
                                       if (context.mounted) {
                                         showTopToast(
                                           context,
-                                          'Failed to save address: $e',
+                                          'Failed to save address: ${_errorMessage(e)}',
                                         );
                                       }
                                     }
@@ -1662,9 +1938,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _showAddressSelectorBottomSheet(
       BuildContext context, AppState appState) {
-    final addressOptions = appState.savedAddresses.isNotEmpty
-        ? appState.savedAddresses
-        : [appState.selectedBranch];
+    final addressOptions = appState.savedAddresses;
 
     showModalBottomSheet(
       context: context,
@@ -1704,6 +1978,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+              if (addressOptions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'You have no saved addresses yet.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.manrope(
+                        fontSize: 12, color: AppTheme.secondary),
+                  ),
+                ),
               ConstrainedBox(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.4,
@@ -1797,6 +2081,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  String? _validateAddressForm({
+    required String name,
+    required String phone,
+    required String line1,
+    required String city,
+  }) {
+    if (name.trim().isEmpty) return 'Recipient name is required.';
+    final trimmedPhone = phone.trim();
+    if (trimmedPhone.isEmpty) return 'Recipient phone is required.';
+    final digitCount = trimmedPhone.replaceAll(RegExp(r'\D'), '').length;
+    if (!RegExp(r'^\+?[0-9 ()\-]+$').hasMatch(trimmedPhone) ||
+        digitCount < 7 ||
+        digitCount > 15) {
+      return 'Enter a valid phone number.';
+    }
+    if (line1.trim().isEmpty) return 'Address line 1 is required.';
+    if (city.trim().isEmpty) return 'City is required.';
+    return null;
+  }
+
   Widget _addressField(
     TextEditingController controller,
     String hint, {
@@ -1833,6 +2137,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _showSuccessDialog(BuildContext context, String orderId) {
+    // Capture the navigator now: the checkout route is replaced below, so its
+    // context must not be used after the dialog closes.
+    final navigator = Navigator.of(context);
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1889,12 +2196,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     onPressed: () {
                       Navigator.pop(ctx); // Close dialog
-                      Navigator.pop(context); // Pop checkout screen
-                      Navigator.push(
-                        context,
+                      // Replace the checkout screen with order tracking.
+                      navigator.pushReplacement(
                         MaterialPageRoute(
-                          builder: (context) =>
-                              TrackOrderScreen(orderId: orderId),
+                          builder: (_) => TrackOrderScreen(orderId: orderId),
                         ),
                       );
                     },

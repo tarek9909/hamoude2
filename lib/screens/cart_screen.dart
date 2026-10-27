@@ -9,6 +9,7 @@ import '../widgets/apothecary_icons.dart';
 import 'checkout_screen.dart';
 import '../widgets/app_refresh.dart';
 import '../widgets/top_toast.dart';
+import 'login_screen.dart';
 import 'product_detail_screen.dart';
 
 class CartScreen extends StatelessWidget {
@@ -51,11 +52,16 @@ class CartScreen extends StatelessWidget {
             IconButton(
               icon: Icon(Icons.share_outlined, color: AppTheme.primary),
               onPressed: () async {
-                final shareUrl =
-                    'https://zeyy.app/store/${appState.api.storeSlug}/cart?items=${appState.cart.map((item) => '${item.product.id}:${item.quantity}').join(',')}';
-                await Clipboard.setData(ClipboardData(text: shareUrl));
+                // No public storefront web domain is configured for this
+                // store, so share a readable list of the bag (including the
+                // chosen variant) instead of a link that opens nothing.
+                final lines = appState.cart
+                    .map((item) => '- ${item.displayName} x${item.quantity}')
+                    .join('\n');
+                final shareText = '${appState.appName} bag:\n$lines';
+                await Clipboard.setData(ClipboardData(text: shareText));
                 if (context.mounted) {
-                  showTopToast(context, 'Cart link copied to clipboard!');
+                  showTopToast(context, 'Bag list copied to clipboard!');
                 }
               },
               tooltip: 'Share Cart',
@@ -300,23 +306,24 @@ class CartScreen extends StatelessWidget {
                                               const SizedBox(width: 10),
                                               GestureDetector(
                                                 onTap: () {
-                                                  if (item.quantity <
-                                                      item.stockQuantity) {
+                                                  final maxQty = appState
+                                                      .maxCartQuantityFor(item);
+                                                  final limitMessage = item
+                                                          .isPreorder
+                                                      ? 'You can pre-order up to $maxQty of this item.'
+                                                      : 'Only $maxQty items in stock.';
+                                                  if (item.quantity < maxQty) {
                                                     final updated = appState
                                                         .updateCartItemQuantity(
                                                             item,
                                                             item.quantity + 1);
                                                     if (!updated) {
-                                                      showTopToast(
-                                                        context,
-                                                        'Only ${item.stockQuantity} items in stock.',
-                                                      );
+                                                      showTopToast(context,
+                                                          limitMessage);
                                                     }
                                                   } else {
                                                     showTopToast(
-                                                      context,
-                                                      'Only ${item.stockQuantity} items in stock.',
-                                                    );
+                                                        context, limitMessage);
                                                   }
                                                 },
                                                 child: Container(
@@ -366,64 +373,7 @@ class CartScreen extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Subtotal',
-                                    style: GoogleFonts.manrope(
-                                        color: AppTheme.secondary,
-                                        fontSize: 13)),
-                                Text(
-                                    '\$${appState.cartSubtotal.toStringAsFixed(2)}',
-                                    style: GoogleFonts.manrope(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13)),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('Delivery Charge',
-                                    style: GoogleFonts.manrope(
-                                        color: AppTheme.secondary,
-                                        fontSize: 13)),
-                                Text(
-                                  appState.cartDeliveryFee == 0
-                                      ? '\$0.00'
-                                      : '\$${appState.cartDeliveryFee.toStringAsFixed(2)}',
-                                  style: GoogleFonts.manrope(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: AppTheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Divider(color: AppTheme.border, thickness: 0.6),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Total Estimate',
-                                  style: GoogleFonts.ebGaramond(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.primary,
-                                  ),
-                                ),
-                                Text(
-                                  '\$${appState.cartTotal.toStringAsFixed(2)}',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            ..._buildTotalsRows(appState),
                             const SizedBox(height: 12),
                             if (appState.isWholesaleMode &&
                                 appState.cartSubtotal <
@@ -472,7 +422,17 @@ class CartScreen extends StatelessWidget {
                                             context,
                                             'Sign in or create an account to continue to checkout.',
                                           );
-                                          appState.setTabIndex(4);
+                                          if (appState.isTabEnabled(4)) {
+                                            appState.setTabIndex(4);
+                                          } else {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const LoginScreen(),
+                                              ),
+                                            );
+                                          }
                                           return;
                                         }
                                         Navigator.push(
@@ -492,5 +452,97 @@ class CartScreen extends StatelessWidget {
                   ],
                 ),
     );
+  }
+
+  Widget _totalsRow(String label, String value, {bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style:
+                  GoogleFonts.manrope(color: AppTheme.secondary, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            value,
+            style: GoogleFonts.manrope(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: highlight ? const Color(0xFF556156) : AppTheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildTotalsRows(AppState appState) {
+    final quote = appState.cartQuote;
+    final subtotal = quote?.subtotal ?? appState.cartSubtotal;
+    final discount = quote?.discount ?? appState.cartDiscount;
+    // Quote-aware in AppState: uses the quote when present, local otherwise.
+    final deliveryFee = appState.cartDeliveryFee;
+    final tax = quote?.tax ?? 0.0;
+    final total = appState.cartTotal;
+    final labels = (quote?.appliedLabels ?? const <String>[])
+        .where((label) => label.trim().isNotEmpty)
+        .toList();
+
+    return [
+      _totalsRow('Subtotal', '\$${subtotal.toStringAsFixed(2)}'),
+      if (discount > 0)
+        _totalsRow(
+          labels.isEmpty ? 'Discount' : 'Discount (${labels.join(', ')})',
+          '-\$${discount.toStringAsFixed(2)}',
+          highlight: true,
+        ),
+      _totalsRow('Delivery Charge', '\$${deliveryFee.toStringAsFixed(2)}'),
+      if (tax > 0) _totalsRow('Tax', '\$${tax.toStringAsFixed(2)}'),
+      Divider(color: AppTheme.border, thickness: 0.6),
+      const SizedBox(height: 8),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Total Estimate',
+                style: GoogleFonts.ebGaramond(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primary,
+                ),
+              ),
+              if (appState.isQuotingCart) ...[
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: AppTheme.secondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          Text(
+            '\$${total.toStringAsFixed(2)}',
+            style: GoogleFonts.manrope(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.primary,
+            ),
+          ),
+        ],
+      ),
+    ];
   }
 }

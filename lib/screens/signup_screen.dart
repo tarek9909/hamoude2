@@ -24,9 +24,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   bool _isLoading = false;
   bool _agreedToPolicies = false;
+  late final TapGestureRecognizer _policiesRecognizer;
+
+  @override
+  void initState() {
+    super.initState();
+    _policiesRecognizer = TapGestureRecognizer()..onTap = _openPolicies;
+  }
+
+  void _openPolicies() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final url =
+        appState.api.getLegalPolicyUrl('privacy-policy-and-terms-of-use');
+    PoliciesWebViewScreen.open(
+      context,
+      url: url,
+      title: 'Terms & Policies',
+    );
+  }
 
   @override
   void dispose() {
+    _policiesRecognizer.dispose();
     _nameController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -85,7 +104,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showTopToast(context, e.toString().replaceAll('Exception: ', ''));
+        showTopToast(
+          context,
+          userFacingError(e,
+              fallback: 'Unable to create your account. Please try again.'),
+        );
       }
     } finally {
       if (mounted) {
@@ -391,24 +414,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                                   decoration:
                                                       TextDecoration.underline,
                                                 ),
-                                                recognizer:
-                                                    TapGestureRecognizer()
-                                                      ..onTap = () {
-                                                        final url = appState.api
-                                                            .getLegalPolicyUrl(
-                                                                'privacy-policy-and-terms-of-use');
-                                                        Navigator.push(
-                                                          context,
-                                                          MaterialPageRoute(
-                                                            builder: (context) =>
-                                                                PoliciesWebViewScreen(
-                                                              url: url,
-                                                              title:
-                                                                  'Terms & Policies',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
+                                                recognizer: _policiesRecognizer,
                                               ),
                                               const TextSpan(text: '.'),
                                             ],
@@ -423,7 +429,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                     height: 52,
                                     child: ElevatedButton(
                                       onPressed:
-                                          _isLoading ? () {} : _handleSignUp,
+                                          _isLoading ? null : _handleSignUp,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.primary,
                                         foregroundColor: Colors.white,

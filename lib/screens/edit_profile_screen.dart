@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -50,10 +51,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         showTopToast(
             context, error.message?.toString() ?? 'Enter a valid name.');
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         showTopToast(
-            context, 'Unable to update your profile. Please try again.');
+          context,
+          userFacingError(error,
+              fallback: 'Unable to update your profile. Please try again.'),
+        );
       }
     } finally {
       if (mounted) {
@@ -77,13 +81,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (picked == null || !mounted) {
         return;
       }
-      await context.read<AppState>().uploadProfileImage(picked.path);
+      await context.read<AppState>().uploadProfileImage(picked);
       if (mounted) {
         showTopToast(context, 'Profile picture updated successfully.');
       }
-    } catch (_) {
+    } catch (error) {
+      // Shows the specific format/size message (ArgumentError) or the
+      // server's user-facing message, never a raw response body.
       if (mounted) {
-        showTopToast(context, 'Unable to update your profile picture.');
+        showTopToast(
+          context,
+          userFacingError(error,
+              fallback: 'Unable to update your profile picture.'),
+        );
       }
     } finally {
       if (mounted) {
@@ -132,10 +142,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   setState(() => _isPickingImage = true);
                   try {
                     await context.read<AppState>().removeProfileImage();
-                  } catch (_) {
+                  } catch (error) {
                     if (mounted) {
                       showTopToast(
-                          context, 'Unable to remove your profile picture.');
+                        context,
+                        userFacingError(error,
+                            fallback: 'Unable to remove your profile picture.'),
+                      );
                     }
                   } finally {
                     if (mounted) {
@@ -175,7 +188,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             AppTheme.primary.withValues(alpha: 0.1),
                         backgroundImage: appState.profileImageUrl == null
                             ? null
-                            : (appState.profileImageUrl!.startsWith('http')
+                            : (appState.profileImageUrl!.startsWith('http') ||
+                                        kIsWeb
                                     ? NetworkImage(appState.profileImageUrl!)
                                     : FileImage(
                                         File(appState.profileImageUrl!)))

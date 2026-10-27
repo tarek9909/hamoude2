@@ -28,7 +28,12 @@ class ProductCard extends StatelessWidget {
     final formattedPrice =
         product.price.toStringAsFixed(product.price % 1 == 0 ? 0 : 2);
     final availableStockQuantity = product.availableStockQuantity;
-    final showWholesaleOriginal = discountedPrice == null &&
+    // Only show a discount when it actually lowers the price.
+    final double? shownDiscountPrice =
+        discountedPrice != null && discountedPrice! < product.price
+            ? discountedPrice
+            : null;
+    final showWholesaleOriginal = shownDiscountPrice == null &&
         retailPrice != null &&
         retailPrice > product.price;
     final formattedRetailPrice =
@@ -157,7 +162,8 @@ class ProductCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                              if (!product.isPreorder && availableStockQuantity > 0 &&
+                            if (!product.isPreorder &&
+                                availableStockQuantity > 0 &&
                                 availableStockQuantity <= 3) ...[
                               const SizedBox(width: 6),
                               Container(
@@ -195,7 +201,7 @@ class ProductCard extends StatelessWidget {
                         ),
                       ),
                       // Out of stock or low stock badge
-                        if (availableStockQuantity == 0 && !product.isPreorder)
+                      if (availableStockQuantity == 0 && !product.isPreorder)
                         Positioned.fill(
                           child: Container(
                             color: Colors.black.withValues(alpha: 0.35),
@@ -221,7 +227,7 @@ class ProductCard extends StatelessWidget {
                           ),
                         ),
                       // Add to Bag Button
-                        if (availableStockQuantity > 0 || product.isPreorder)
+                      if (availableStockQuantity > 0 || product.isPreorder)
                         Positioned(
                           bottom: 10,
                           right: 10,
@@ -245,15 +251,14 @@ class ProductCard extends StatelessWidget {
                                   : null;
                               final state =
                                   Provider.of<AppState>(context, listen: false);
-                              final added =
-                                  state.addToCart(product, variant: variant);
-                              final stockQuantity = variant?.stockQuantity ??
-                                  product.stockQuantity;
+                              final blockReason =
+                                  state.cartAddBlockReason(product, 1, variant);
+                              if (blockReason == null) {
+                                state.addToCart(product, variant: variant);
+                              }
                               showTopToast(
                                 context,
-                                added
-                                    ? '${product.name} added to bag'
-                                    : 'Only $stockQuantity items in stock.',
+                                blockReason ?? '${product.name} added to bag',
                               );
                             },
                             child: Container(
@@ -309,12 +314,12 @@ class ProductCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              if (discountedPrice != null)
+              if (shownDiscountPrice != null)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '\$${discountedPrice!.toStringAsFixed(discountedPrice! % 1 == 0 ? 0 : 2)}',
+                      '\$${shownDiscountPrice.toStringAsFixed(shownDiscountPrice % 1 == 0 ? 0 : 2)}',
                       style: GoogleFonts.manrope(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,

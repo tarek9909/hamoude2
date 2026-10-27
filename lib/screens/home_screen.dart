@@ -6,6 +6,7 @@ import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../models/product.dart';
 import '../widgets/top_toast.dart';
+import '../widgets/product_card.dart';
 import 'product_detail_screen.dart';
 import 'policies_webview_screen.dart';
 import 'bundles_screen.dart';
@@ -15,12 +16,66 @@ import 'browse_collection_screen.dart';
 import 'offers_screen.dart';
 import 'notifications_screen.dart';
 import 'preorders_screen.dart';
-import '../widgets/product_card.dart';
 
-class HomeScreen extends StatelessWidget {
+double? _parseBundleAmount(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
+String _formatBundleAmount(double value) {
+  return value.toStringAsFixed(value % 1 == 0 ? 0 : 2);
+}
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  // Product ids with a quick-add in flight; repeated taps are ignored.
+  final Set<String> _quickAddInFlight = {};
+
+  // Back-off for the infinite-scroll loader: after a page load that made no
+  // progress (offline / server error) wait before trying again.
+  DateTime? _homeLoadRetryAfter;
+  int _homeLoadFailures = 0;
+
+  void _maybeLoadMoreHomeProducts(AppState appState) {
+    final retryAfter = _homeLoadRetryAfter;
+    if (retryAfter != null && DateTime.now().isBefore(retryAfter)) return;
+    final countBefore = appState.homeProducts.length;
+    appState.loadHomeProducts().then((_) {
+      if (!mounted) return;
+      final madeProgress = appState.homeProducts.length > countBefore ||
+          !appState.homeProductsHasMore;
+      if (madeProgress) {
+        _homeLoadFailures = 0;
+        _homeLoadRetryAfter = null;
+      } else {
+        _homeLoadFailures = (_homeLoadFailures + 1).clamp(1, 6);
+        _homeLoadRetryAfter = DateTime.now()
+            .add(Duration(seconds: 5 * (1 << (_homeLoadFailures - 1))));
+      }
+    });
+  }
+
   Future<void> _handlePromotionProductAdd(
+    BuildContext context,
+    Product product,
+  ) async {
+    if (_quickAddInFlight.contains(product.id)) return;
+    _quickAddInFlight.add(product.id);
+    try {
+      await _performPromotionProductAdd(context, product);
+    } finally {
+      _quickAddInFlight.remove(product.id);
+    }
+  }
+
+  Future<void> _performPromotionProductAdd(
     BuildContext context,
     Product product,
   ) async {
@@ -57,14 +112,13 @@ class HomeScreen extends StatelessWidget {
     final variant = resolvedProduct.variants.length == 1
         ? resolvedProduct.variants.first
         : null;
-    final added = state.addToCart(resolvedProduct, variant: variant);
-    final stockQuantity =
-        variant?.stockQuantity ?? resolvedProduct.stockQuantity;
+    final blockReason = state.cartAddBlockReason(resolvedProduct, 1, variant);
+    if (blockReason == null) {
+      state.addToCart(resolvedProduct, variant: variant);
+    }
     showTopToast(
       context,
-      added
-          ? '${resolvedProduct.name} added to bag'
-          : 'Only $stockQuantity items in stock.',
+      blockReason ?? '${resolvedProduct.name} added to bag',
     );
   }
 
@@ -98,6 +152,16 @@ class HomeScreen extends StatelessWidget {
     final preorderProducts =
         appState.products.where((product) => product.isPreorder).toList();
     final preorderCount = preorderProducts.length;
+    final allProducts =
+        appState.productsEnabled ? appState.homeProducts : <Product>[];
+
+    void openPreorders() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const PreordersScreen(),
+        ),
+      );
+    }
 
     // Build promotions list dynamically
     final List<Map<String, dynamic>> displayPromotionsData = [];
@@ -113,12 +177,18 @@ class HomeScreen extends StatelessWidget {
             '';
 
         final discountType = promo['discount_type']?.toString() ?? 'percentage';
-        final discountVal =
-            (promo['discount_value'] as num?)?.toDouble() ?? 20.0;
+        final rawDiscount = promo['discount_value'];
+        final double discountVal = (rawDiscount is num
+                ? rawDiscount.toDouble()
+                : double.tryParse(rawDiscount?.toString() ?? '')) ??
+            0.0;
+        final hasDiscount = discountVal > 0;
         final discountLabel = promo['discount_label']?.toString() ??
             promo['badge']?.toString() ??
-            (discountType == 'percentage'
-                ? '-${discountVal.toStringAsFixed(0)}% OFF'
+            (hasDiscount
+                ? (discountType == 'percentage'
+                    ? '-${discountVal.toStringAsFixed(0)}% OFF'
+                    : '-\$${discountVal.toStringAsFixed(discountVal % 1 == 0 ? 0 : 2)} OFF')
                 : 'SPECIAL OFFER');
 
         final rawItems = promo['product_links'] as List? ?? [];
@@ -150,7 +220,7 @@ class HomeScreen extends StatelessWidget {
               promoPriceStr != null &&
               double.tryParse(promoPriceStr) != null) {
             discPrice = double.parse(promoPriceStr);
-          } else {
+          } else if (hasDiscount) {
             if (discountType == 'percentage') {
               discPrice = product.price * (1 - discountVal / 100);
             } else {
@@ -223,611 +293,877 @@ class HomeScreen extends StatelessWidget {
         bottom: false,
         child: RefreshIndicator(
           onRefresh: () async {
+            _homeLoadFailures = 0;
+            _homeLoadRetryAfter = null;
             await appState.refreshAllData();
           },
           color: AppTheme.primary,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics()),
-            slivers: [
-              // Boutique Header matching Stitch
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    'SKIN-CELLA',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.ebGaramond(
-                                      fontSize: isCompactHeader ? 22 : 26,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing:
-                                          isCompactHeader ? 1.2 : 3.0,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                                ),
-                                if (appState.isWholesaleMode) ...[
-                                  SizedBox(width: isCompactHeader ? 5 : 8),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: isCompactHeader ? 6 : 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE8ECE5),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(
-                                          color: AppTheme.primary, width: 0.5),
-                                    ),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification.metrics.axis == Axis.vertical &&
+                  notification.metrics.extentAfter < 600 &&
+                  appState.productsEnabled &&
+                  appState.homeProductsHasMore &&
+                  !appState.isLoadingHomeProducts) {
+                _maybeLoadMoreHomeProducts(appState);
+              }
+              return false;
+            },
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics()),
+              slivers: [
+                // Boutique Header matching Stitch
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
                                     child: Text(
-                                      'WHOLESALE',
-                                      style: GoogleFonts.manrope(
-                                        fontSize: isCompactHeader ? 7 : 8,
+                                      'SKIN-CELLA',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.ebGaramond(
+                                        fontSize: isCompactHeader ? 22 : 26,
                                         fontWeight: FontWeight.bold,
-                                        color: AppTheme.primary,
                                         letterSpacing:
-                                            isCompactHeader ? 0.2 : 0.5,
+                                            isCompactHeader ? 1.2 : 3.0,
+                                        color: AppTheme.primary,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            GestureDetector(
-                              onTap: () =>
-                                  _showBranchSelector(context, appState),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.spa_outlined,
-                                      size: 13, color: AppTheme.secondary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    appState.selectedBranch,
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.secondary,
+                                  if (appState.isWholesaleMode) ...[
+                                    SizedBox(width: isCompactHeader ? 5 : 8),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: isCompactHeader ? 6 : 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE8ECE5),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                            color: AppTheme.primary,
+                                            width: 0.5),
+                                      ),
+                                      child: Text(
+                                        'WHOLESALE',
+                                        style: GoogleFonts.manrope(
+                                          fontSize: isCompactHeader ? 7 : 8,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.primary,
+                                          letterSpacing:
+                                              isCompactHeader ? 0.2 : 0.5,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                  Icon(Icons.keyboard_arrow_down,
-                                      size: 12, color: AppTheme.secondary),
+                                  ],
                                 ],
                               ),
-                            ),
+                              const SizedBox(height: 2),
+                              GestureDetector(
+                                onTap: () =>
+                                    _showBranchSelector(context, appState),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.spa_outlined,
+                                        size: 13, color: AppTheme.secondary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      appState.selectedBranch,
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.secondary,
+                                      ),
+                                    ),
+                                    Icon(Icons.keyboard_arrow_down,
+                                        size: 12, color: AppTheme.secondary),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (appState.productsEnabled) ...[
+                              IconButton(
+                                icon: Icon(Icons.search,
+                                    color: AppTheme.primary, size: 24),
+                                onPressed: () {
+                                  appState.setTabIndex(
+                                      1); // Go to Search Screen tab
+                                },
+                                tooltip: 'Search',
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                            if (appState.notificationsEnabled)
+                              Stack(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                        Icons.notifications_none_outlined,
+                                        color: AppTheme.primary),
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const NotificationsScreen(),
+                                      ),
+                                    ),
+                                    tooltip: 'Notifications',
+                                  ),
+                                  if (appState.notifications
+                                      .any((n) => !n['isRead']))
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFBA1A1A),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (appState.productsEnabled) ...[
-                            IconButton(
-                              icon: Icon(Icons.search,
-                                  color: AppTheme.primary, size: 24),
-                              onPressed: () {
-                                appState
-                                    .setTabIndex(1); // Go to Search Screen tab
-                              },
-                              tooltip: 'Search',
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          if (appState.notificationsEnabled)
-                            Stack(
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.notifications_none_outlined,
-                                      color: AppTheme.primary),
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const NotificationsScreen(),
-                                    ),
-                                  ),
-                                  tooltip: 'Notifications',
-                                ),
-                                if (appState.notifications
-                                    .any((n) => !n['isRead']))
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      width: 7,
-                                      height: 7,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFFBA1A1A),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              if (appState.contentEnabled && appState.banners.isNotEmpty)
-                // Boutique Carousel at the top
-                SliverToBoxAdapter(
-                  child: BoutiqueCarousel(
-                    banners: appState.banners,
-                    onCategorySelected: (category) =>
-                        appState.setCategory(category),
-                    onSearchQuery: (query) => appState.setSearchQuery(query),
-                  ),
-                ),
-
-              if (appState.contentEnabled && allStories.isNotEmpty)
-                // Live marketing story strip.
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 88,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      itemCount: allStories.length,
-                      itemBuilder: (context, index) {
-                        final story = allStories[index];
-                        return StoryItemWidget(
-                          title: story['title'],
-                          imageUrl:
-                              appState.api.resolveMediaUrl(story['imageUrl']),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              PageRouteBuilder(
-                                pageBuilder:
-                                    (context, animation, secondaryAnimation) =>
-                                        InstagramStoriesViewer(
-                                  initialStoryIndex: index,
-                                  allStories: allStories,
-                                ),
-                                transitionsBuilder: (context, animation,
-                                    secondaryAnimation, child) {
-                                  const begin = Offset(0.0, 1.0);
-                                  const end = Offset.zero;
-                                  const curve = Curves.easeInOut;
-                                  var tween = Tween(begin: begin, end: end)
-                                      .chain(CurveTween(curve: curve));
-                                  return SlideTransition(
-                                    position: animation.drive(tween),
-                                    child: child,
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                        );
-                      },
+                      ],
                     ),
                   ),
                 ),
 
-              if (!appState.isWholesaleMode &&
-                  appState.bundlesEnabled &&
-                  displayBundles.isNotEmpty) ...[
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 24),
-                ),
+                if (appState.contentEnabled && appState.banners.isNotEmpty)
+                  // Boutique Carousel at the top
+                  SliverToBoxAdapter(
+                    child: BoutiqueCarousel(
+                      banners: appState.banners,
+                      onCategorySelected: (category) {
+                        appState.setCategory(category);
+                        if (appState.isTabEnabled(1)) {
+                          // Show the filtered catalog tab.
+                          appState.setTabIndex(1);
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ShopCatalogScreen(
+                                categoryFilter: category,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      onSearchQuery: (query) {
+                        appState.setSearchQuery(query);
+                        if (appState.isTabEnabled(1)) {
+                          appState.setTabIndex(1);
+                        }
+                      },
+                    ),
+                  ),
 
-                // Curated bundles section.
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Curated Bundles',
-                                    style: GoogleFonts.ebGaramond(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF070F0A),
-                                    ),
+                if (appState.contentEnabled && allStories.isNotEmpty)
+                  // Live marketing story strip.
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 88,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        itemCount: allStories.length,
+                        itemBuilder: (context, index) {
+                          final story = allStories[index];
+                          return StoryItemWidget(
+                            title: story['title'],
+                            imageUrl:
+                                appState.api.resolveMediaUrl(story['imageUrl']),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation,
+                                          secondaryAnimation) =>
+                                      InstagramStoriesViewer(
+                                    initialStoryIndex: index,
+                                    allStories: allStories,
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const BundlesScreen(),
-                                      ),
+                                  transitionsBuilder: (context, animation,
+                                      secondaryAnimation, child) {
+                                    const begin = Offset(0.0, 1.0);
+                                    const end = Offset.zero;
+                                    const curve = Curves.easeInOut;
+                                    var tween = Tween(begin: begin, end: end)
+                                        .chain(CurveTween(curve: curve));
+                                    return SlideTransition(
+                                      position: animation.drive(tween),
+                                      child: child,
                                     );
                                   },
-                                  child: Container(
-                                    decoration: const BoxDecoration(
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: Color(0xFF070F0A),
-                                          width: 1.0,
-                                        ),
-                                      ),
-                                    ),
-                                    padding: const EdgeInsets.only(bottom: 2),
-                                    child: Text(
-                                      'VIEW ALL',
-                                      style: GoogleFonts.manrope(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.5,
-                                        color: const Color(0xFF070F0A),
-                                      ),
-                                    ),
-                                  ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Thoughtfully paired botanical essentials for targeted results.',
-                              style: GoogleFonts.manrope(
-                                fontSize: 13,
-                                color: const Color(0xFF5E5E5B),
-                              ),
-                            ),
-                          ],
-                        ),
+                              );
+                            },
+                          );
+                        },
                       ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 415,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          itemCount: displayBundles.length,
-                          itemBuilder: (context, index) {
-                            final bundle = displayBundles[index];
-                            final imageUrl = bundle['image_url']?.toString() ??
-                                bundle['media_url']?.toString() ??
-                                '';
-
-                            final tag = bundle['subtitle']?.toString() ??
-                                bundle['tag']?.toString() ??
-                                '';
-
-                            final title = bundle['name']?.toString() ??
-                                bundle['title']?.toString() ??
-                                "Bundle";
-
-                            final description =
-                                bundle['description']?.toString() ??
-                                    bundle['summary']?.toString() ??
-                                    "";
-
-                            final rawItems = bundle['items'] as List? ?? [];
-                            final itemsList = rawItems
-                                .whereType<Map<String, dynamic>>()
-                                .toList();
-
-                            double computedOriginalPrice = 0.0;
-                            for (final item in itemsList) {
-                              final prodId =
-                                  item['product_id']?.toString() ?? '';
-                              final qty =
-                                  (item['quantity'] as num?)?.toDouble() ?? 1.0;
-                              Product? p;
-                              try {
-                                p = appState.products.firstWhere((entry) =>
-                                    Product.compareIds(entry.id, prodId));
-                              } catch (_) {}
-                              final itemPrice = p?.price ??
-                                  (item['unit_price_snapshot'] as num?)
-                                      ?.toDouble() ??
-                                  0.0;
-                              computedOriginalPrice += itemPrice * qty;
-                            }
-
-                            final bundlePriceVal =
-                                (bundle['bundle_price'] as num?)?.toDouble() ??
-                                    double.tryParse(
-                                        bundle['price']?.toString() ?? '') ??
-                                    110.0;
-
-                            final price = bundlePriceVal.toStringAsFixed(
-                                bundlePriceVal % 1 == 0 ? 0 : 2);
-                            final originalPrice = computedOriginalPrice > 0
-                                ? computedOriginalPrice.toStringAsFixed(
-                                    computedOriginalPrice % 1 == 0 ? 0 : 2)
-                                : (bundlePriceVal * 1.27).toStringAsFixed(0);
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 16),
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          BundleDetailScreen(bundle: bundle),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  width: 290,
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF4F5F2),
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: AspectRatio(
-                                          aspectRatio: 1.15,
-                                          child: Image.network(
-                                            imageUrl,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                Container(
-                                              color: Colors.white,
-                                              child: Icon(
-                                                Icons.spa_outlined,
-                                                color: AppTheme.secondary,
-                                                size: 40,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        tag.toUpperCase(),
-                                        style: GoogleFonts.manrope(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF7E807C),
-                                          letterSpacing: 1.5,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        title,
-                                        style: GoogleFonts.ebGaramond(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF070F0A),
-                                          height: 1.2,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        description,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.manrope(
-                                          fontSize: 12.5,
-                                          color: const Color(0xFF5E5E5B),
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.baseline,
-                                            textBaseline:
-                                                TextBaseline.alphabetic,
-                                            children: [
-                                              Text(
-                                                '\$$price',
-                                                style: GoogleFonts.manrope(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                  color:
-                                                      const Color(0xFF070F0A),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                '\$$originalPrice',
-                                                style: GoogleFonts.manrope(
-                                                  fontSize: 13,
-                                                  color:
-                                                      const Color(0xFF9E9E9E),
-                                                  decoration: TextDecoration
-                                                      .lineThrough,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          Container(
-                                            decoration: const BoxDecoration(
-                                              border: Border(
-                                                bottom: BorderSide(
-                                                  color: Color(0xFF070F0A),
-                                                  width: 1.0,
-                                                ),
-                                              ),
-                                            ),
-                                            padding: const EdgeInsets.only(
-                                                bottom: 2),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  'EXPLORE',
-                                                  style: GoogleFonts.manrope(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                    letterSpacing: 1.5,
-                                                    color:
-                                                        const Color(0xFF070F0A),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                const Icon(
-                                                  Icons.arrow_forward,
-                                                  size: 11,
-                                                  color: Color(0xFF070F0A),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
 
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 24),
-                ),
-              ],
-
-              if (appState.brandsEnabled && displayBrands.isNotEmpty)
-                // Shop by brand section.
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Shop by Brand',
+                if (!appState.isWholesaleMode) ...[
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 24),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Preorders',
                                 style: GoogleFonts.ebGaramond(
                                   fontSize: 26,
                                   fontWeight: FontWeight.bold,
                                   color: const Color(0xFF070F0A),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 16),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const BrowseCollectionScreen(
-                                            mode: BrowseMode.brands),
+                              GestureDetector(
+                                onTap: openPreorders,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Color(0xFF070F0A),
+                                        width: 1,
+                                      ),
+                                    ),
                                   ),
-                                );
-                              },
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: Color(0xFF070F0A),
-                                      width: 1.0,
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    'VIEW ALL',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.5,
+                                      color: const Color(0xFF070F0A),
                                     ),
                                   ),
                                 ),
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: Text(
-                                  'VIEW ALL',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                    color: const Color(0xFF070F0A),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            preorderCount == 0
+                                ? 'Reserve upcoming arrivals before they reach the shelves.'
+                                : preorderCount == 1
+                                    ? '1 preorder item available now.'
+                                    : '$preorderCount preorder items available now.',
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              color: AppTheme.secondary,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (preorderProducts.isEmpty)
+                            Material(
+                              color: const Color(0xFFF0F2ED),
+                              borderRadius: BorderRadius.circular(18),
+                              child: InkWell(
+                                onTap: openPreorders,
+                                borderRadius: BorderRadius.circular(18),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 20,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 46,
+                                        height: 46,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                        child: Icon(
+                                          Icons.inventory_2_outlined,
+                                          color: AppTheme.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Text(
+                                          'Explore preorder arrivals',
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF070F0A),
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 15,
+                                        color: AppTheme.secondary,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 145,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          itemCount: displayBrands.length,
-                          itemBuilder: (context, index) {
-                            final brand = displayBrands[index];
-                            final rawUrl = brand['logo_url']?.toString() ??
-                                brand['image_url']?.toString() ??
-                                brand['image']?.toString() ??
-                                '';
-                            final imageUrl =
-                                appState.api.resolveMediaUrl(rawUrl);
-                            final name = brand['name']?.toString() ?? 'BRAND';
+                            )
+                          else
+                            SizedBox(
+                              height: 230,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: preorderProducts.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 16),
+                                itemBuilder: (context, index) {
+                                  final product = preorderProducts[index];
+                                  final imageUrl = appState.api.resolveMediaUrl(
+                                    product.imageUrl,
+                                  );
 
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 16),
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ShopCatalogScreen(
-                                        brandFilter: name,
+                                  return SizedBox(
+                                    width: 145,
+                                    child: GestureDetector(
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => ProductDetailScreen(
+                                            product: product,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            width: 145,
+                                            height: 165,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF4F5F2),
+                                              borderRadius:
+                                                  BorderRadius.circular(24),
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(24),
+                                              child: imageUrl.isNotEmpty
+                                                  ? Image.network(
+                                                      imageUrl,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (_, __, ___) =>
+                                                              Container(
+                                                        color: Colors.white,
+                                                        child: Icon(
+                                                          Icons.spa_outlined,
+                                                          color: AppTheme
+                                                              .secondary,
+                                                          size: 32,
+                                                        ),
+                                                      ),
+                                                    )
+                                                  : Container(
+                                                      color: Colors.white,
+                                                      child: Icon(
+                                                        Icons.spa_outlined,
+                                                        color:
+                                                            AppTheme.secondary,
+                                                        size: 32,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(left: 4),
+                                            child: Text(
+                                              product.name,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: GoogleFonts.ebGaramond(
+                                                fontSize: 16.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: const Color(0xFF070F0A),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
                                 },
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      width: 100,
-                                      height: 100,
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE4E6E2),
-                                        borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
+                if (!appState.isWholesaleMode &&
+                    appState.bundlesEnabled &&
+                    displayBundles.isNotEmpty) ...[
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 24),
+                  ),
+
+                  // Curated bundles section.
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Curated Bundles',
+                                      style: GoogleFonts.ebGaramond(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF070F0A),
                                       ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: imageUrl.isNotEmpty
-                                            ? Image.network(
-                                                imageUrl,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    Container(
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const BundlesScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Color(0xFF070F0A),
+                                            width: 1.0,
+                                          ),
+                                        ),
+                                      ),
+                                      padding: const EdgeInsets.only(bottom: 2),
+                                      child: Text(
+                                        'VIEW ALL',
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.5,
+                                          color: const Color(0xFF070F0A),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Thoughtfully paired botanical essentials for targeted results.',
+                                style: GoogleFonts.manrope(
+                                  fontSize: 13,
+                                  color: const Color(0xFF5E5E5B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 415,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            itemCount: displayBundles.length,
+                            itemBuilder: (context, index) {
+                              final bundle = displayBundles[index];
+                              final imageUrl = appState.api.resolveMediaUrl(
+                                  bundle['image_url']?.toString() ??
+                                      bundle['media_url']?.toString());
+
+                              final tag = bundle['subtitle']?.toString() ??
+                                  bundle['tag']?.toString() ??
+                                  '';
+
+                              final title = bundle['name']?.toString() ??
+                                  bundle['title']?.toString() ??
+                                  "Bundle";
+
+                              final description =
+                                  bundle['description']?.toString() ??
+                                      bundle['summary']?.toString() ??
+                                      "";
+
+                              final rawItems = bundle['items'] as List? ?? [];
+                              final itemsList = rawItems
+                                  .whereType<Map<String, dynamic>>()
+                                  .toList();
+
+                              double computedOriginalPrice = 0.0;
+                              for (final item in itemsList) {
+                                final prodId =
+                                    item['product_id']?.toString() ?? '';
+                                final qty =
+                                    (item['quantity'] as num?)?.toDouble() ??
+                                        1.0;
+                                Product? p;
+                                try {
+                                  p = appState.products.firstWhere((entry) =>
+                                      Product.compareIds(entry.id, prodId));
+                                } catch (_) {}
+                                final itemPrice = p?.price ??
+                                    (item['unit_price_snapshot'] as num?)
+                                        ?.toDouble() ??
+                                    0.0;
+                                computedOriginalPrice += itemPrice * qty;
+                              }
+
+                              // Same pricing rules as BundleDetailScreen:
+                              // explicit bundle price, else the sum of the
+                              // components; strike-through only when the
+                              // components really cost more.
+                              final explicitBundlePrice =
+                                  _parseBundleAmount(bundle['bundle_price']) ??
+                                      _parseBundleAmount(bundle['price']);
+                              final effectiveBundlePrice =
+                                  explicitBundlePrice ??
+                                      (computedOriginalPrice > 0
+                                          ? computedOriginalPrice
+                                          : null);
+                              final price = effectiveBundlePrice != null
+                                  ? _formatBundleAmount(effectiveBundlePrice)
+                                  : null;
+                              final originalPrice = explicitBundlePrice !=
+                                          null &&
+                                      computedOriginalPrice >
+                                          explicitBundlePrice
+                                  ? _formatBundleAmount(computedOriginalPrice)
+                                  : null;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 16),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            BundleDetailScreen(bundle: bundle),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 290,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF4F5F2),
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          child: AspectRatio(
+                                            aspectRatio: 1.15,
+                                            child: Image.network(
+                                              imageUrl,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) =>
+                                                  Container(
+                                                color: Colors.white,
+                                                child: Icon(
+                                                  Icons.spa_outlined,
+                                                  color: AppTheme.secondary,
+                                                  size: 40,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          tag.toUpperCase(),
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF7E807C),
+                                            letterSpacing: 1.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          title,
+                                          style: GoogleFonts.ebGaramond(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF070F0A),
+                                            height: 1.2,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          description,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.manrope(
+                                            fontSize: 12.5,
+                                            color: const Color(0xFF5E5E5B),
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.baseline,
+                                              textBaseline:
+                                                  TextBaseline.alphabetic,
+                                              children: [
+                                                if (price != null)
+                                                  Text(
+                                                    '\$$price',
+                                                    style: GoogleFonts.manrope(
+                                                      fontSize: 15,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: const Color(
+                                                          0xFF070F0A),
+                                                    ),
+                                                  ),
+                                                if (originalPrice != null) ...[
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    '\$$originalPrice',
+                                                    style: GoogleFonts.manrope(
+                                                      fontSize: 13,
+                                                      color: const Color(
+                                                          0xFF9E9E9E),
+                                                      decoration: TextDecoration
+                                                          .lineThrough,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            Container(
+                                              decoration: const BoxDecoration(
+                                                border: Border(
+                                                  bottom: BorderSide(
+                                                    color: Color(0xFF070F0A),
+                                                    width: 1.0,
+                                                  ),
+                                                ),
+                                              ),
+                                              padding: const EdgeInsets.only(
+                                                  bottom: 2),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    'EXPLORE',
+                                                    style: GoogleFonts.manrope(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      letterSpacing: 1.5,
+                                                      color: const Color(
+                                                          0xFF070F0A),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  const Icon(
+                                                    Icons.arrow_forward,
+                                                    size: 11,
+                                                    color: Color(0xFF070F0A),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 24),
+                  ),
+                ],
+
+                if (appState.brandsEnabled && displayBrands.isNotEmpty)
+                  // Shop by brand section.
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Shop by Brand',
+                                  style: GoogleFonts.ebGaramond(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF070F0A),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const BrowseCollectionScreen(
+                                              mode: BrowseMode.brands),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Color(0xFF070F0A),
+                                        width: 1.0,
+                                      ),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    'VIEW ALL',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.5,
+                                      color: const Color(0xFF070F0A),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 145,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            itemCount: displayBrands.length,
+                            itemBuilder: (context, index) {
+                              final brand = displayBrands[index];
+                              final rawUrl = brand['logo_url']?.toString() ??
+                                  brand['image_url']?.toString() ??
+                                  brand['image']?.toString() ??
+                                  '';
+                              final imageUrl =
+                                  appState.api.resolveMediaUrl(rawUrl);
+                              final name = brand['name']?.toString() ?? 'BRAND';
+
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 16),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ShopCatalogScreen(
+                                          brandFilter: name,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 100,
+                                        height: 100,
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE4E6E2),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          child: imageUrl.isNotEmpty
+                                              ? Image.network(
+                                                  imageUrl,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      Container(
+                                                    color: Colors.white,
+                                                    child: Icon(
+                                                      Icons.business,
+                                                      color: AppTheme.secondary,
+                                                      size: 28,
+                                                    ),
+                                                  ),
+                                                )
+                                              : Container(
                                                   color: Colors.white,
                                                   child: Icon(
                                                     Icons.business,
@@ -835,144 +1171,147 @@ class HomeScreen extends StatelessWidget {
                                                     size: 28,
                                                   ),
                                                 ),
-                                              )
-                                            : Container(
-                                                color: Colors.white,
-                                                child: Icon(
-                                                  Icons.business,
-                                                  color: AppTheme.secondary,
-                                                  size: 28,
-                                                ),
-                                              ),
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      name.toUpperCase(),
-                                      style: GoogleFonts.manrope(
-                                        fontSize: 10.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: const Color(0xFF070F0A),
-                                        letterSpacing: 1.5,
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        name.toUpperCase(),
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFF070F0A),
+                                          letterSpacing: 1.5,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
-              if (appState.categoriesEnabled &&
-                  displayCategories.isNotEmpty) ...[
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 24),
-                ),
-                // Shop by category section.
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Shop by Category',
-                                style: GoogleFonts.ebGaramond(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF070F0A),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const BrowseCollectionScreen(
-                                            mode: BrowseMode.categories),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: Color(0xFF070F0A),
-                                      width: 1.0,
-                                    ),
-                                  ),
-                                ),
-                                padding: const EdgeInsets.only(bottom: 2),
+                if (appState.categoriesEnabled &&
+                    displayCategories.isNotEmpty) ...[
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 24),
+                  ),
+                  // Shop by category section.
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
                                 child: Text(
-                                  'VIEW ALL',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 11,
+                                  'Shop by Category',
+                                  style: GoogleFonts.ebGaramond(
+                                    fontSize: 26,
                                     fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
                                     color: const Color(0xFF070F0A),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 200,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          itemCount: displayCategories.length,
-                          itemBuilder: (context, index) {
-                            final cat = displayCategories[index];
-                            final name = cat['name'] ?? '';
-                            final imageUrl = cat['image'] ?? '';
-
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 16),
-                              child: GestureDetector(
+                              const SizedBox(width: 16),
+                              GestureDetector(
                                 onTap: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => ShopCatalogScreen(
-                                        categoryFilter: name,
-                                      ),
+                                      builder: (_) =>
+                                          const BrowseCollectionScreen(
+                                              mode: BrowseMode.categories),
                                     ),
                                   );
                                 },
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 145,
-                                      height: 165,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF4F5F2),
-                                        borderRadius: BorderRadius.circular(24),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Color(0xFF070F0A),
+                                        width: 1.0,
                                       ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(24),
-                                        child: imageUrl.isNotEmpty
-                                            ? Image.network(
-                                                imageUrl,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    Container(
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Text(
+                                    'VIEW ALL',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.5,
+                                      color: const Color(0xFF070F0A),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: 200,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            itemCount: displayCategories.length,
+                            itemBuilder: (context, index) {
+                              final cat = displayCategories[index];
+                              final name = cat['name'] ?? '';
+                              final imageUrl = cat['image'] ?? '';
+
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 16),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ShopCatalogScreen(
+                                          categoryFilter: name,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 145,
+                                        height: 165,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF4F5F2),
+                                          borderRadius:
+                                              BorderRadius.circular(24),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(24),
+                                          child: imageUrl.isNotEmpty
+                                              ? Image.network(
+                                                  imageUrl,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      Container(
+                                                    color: Colors.white,
+                                                    child: Icon(
+                                                      Icons.spa_outlined,
+                                                      color: AppTheme.secondary,
+                                                      size: 32,
+                                                    ),
+                                                  ),
+                                                )
+                                              : Container(
                                                   color: Colors.white,
                                                   child: Icon(
                                                     Icons.spa_outlined,
@@ -980,282 +1319,220 @@ class HomeScreen extends StatelessWidget {
                                                     size: 32,
                                                   ),
                                                 ),
-                                              )
-                                            : Container(
-                                                color: Colors.white,
-                                                child: Icon(
-                                                  Icons.spa_outlined,
-                                                  color: AppTheme.secondary,
-                                                  size: 32,
-                                                ),
-                                              ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 4),
-                                      child: Text(
-                                        name,
-                                        style: GoogleFonts.ebGaramond(
-                                          fontSize: 16.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF070F0A),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              if (preorderCount > 0) ...[
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 24),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Preorders',
-                              style: GoogleFonts.ebGaramond(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF070F0A),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const PreordersScreen(),
-                                ),
-                              ),
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: Color(0xFF070F0A),
-                                      width: 1,
-                                    ),
+                                      const SizedBox(height: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 4),
+                                        child: Text(
+                                          name,
+                                          style: GoogleFonts.ebGaramond(
+                                            fontSize: 16.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF070F0A),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: Text(
-                                  'VIEW ALL',
-                                  style: GoogleFonts.manrope(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                    color: const Color(0xFF070F0A),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 330,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            itemCount: preorderProducts.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 16),
-                            itemBuilder: (context, index) => SizedBox(
-                              width: 210,
-                              child: ProductCard(
-                                product: preorderProducts[index],
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
 
-              if (!appState.isWholesaleMode &&
-                  appState.promotionsEnabled &&
-                  displayPromotionsData.isNotEmpty) ...[
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 24),
-                ),
+                if (!appState.isWholesaleMode &&
+                    appState.promotionsEnabled &&
+                    displayPromotionsData.isNotEmpty) ...[
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 24),
+                  ),
 
-                // Dynamic promotion sections from live backend data.
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: displayPromotionsData.map((promoSection) {
-                      final String promoId = promoSection['id'] ?? '';
-                      final String title = promoSection['title'] ?? '';
-                      final String description =
-                          promoSection['description'] ?? '';
-                      final List<Map<String, dynamic>> promoProducts =
-                          promoSection['products'] ?? [];
+                  // Dynamic promotion sections from live backend data.
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: displayPromotionsData.map((promoSection) {
+                        final String promoId = promoSection['id'] ?? '';
+                        final String title = promoSection['title'] ?? '';
+                        final String description =
+                            promoSection['description'] ?? '';
+                        final List<Map<String, dynamic>> promoProducts =
+                            promoSection['products'] ?? [];
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        title,
-                                        style: GoogleFonts.ebGaramond(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFF070F0A),
-                                          height: 1.15,
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          style: GoogleFonts.ebGaramond(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF070F0A),
+                                            height: 1.15,
+                                          ),
                                         ),
                                       ),
+                                      const SizedBox(width: 16),
+                                      GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => OffersScreen(
+                                                selectedPromoId: promoId,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: Color(0xFF070F0A),
+                                                width: 1.0,
+                                              ),
+                                            ),
+                                          ),
+                                          padding:
+                                              const EdgeInsets.only(bottom: 2),
+                                          child: Text(
+                                            'VIEW ALL',
+                                            style: GoogleFonts.manrope(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.5,
+                                              color: const Color(0xFF070F0A),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (description.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      description,
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 13,
+                                        color: const Color(0xFF5E5E5B),
+                                      ),
                                     ),
-                                    const SizedBox(width: 16),
-                                    GestureDetector(
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: 415,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                itemCount: promoProducts.length,
+                                itemBuilder: (context, index) {
+                                  final item = promoProducts[index];
+                                  final product = item['product'] as Product;
+                                  final discountedPriceVal =
+                                      (item['discountedPrice'] as num)
+                                          .toDouble();
+                                  final originalPriceVal =
+                                      item['originalPrice'] != null
+                                          ? (item['originalPrice'] as num)
+                                              .toDouble()
+                                          : product.price;
+
+                                  final imageUrl = product.imageUrl;
+                                  final name = product.name;
+                                  final shortDesc = product
+                                          .shortDescription.isNotEmpty
+                                      ? product.shortDescription
+                                      : [product.volume, product.category]
+                                          .where(
+                                              (part) => part.trim().isNotEmpty)
+                                          .join(' ');
+                                  final discountLabel =
+                                      item['discountLabel']?.toString() ?? '';
+                                  final showOriginalPrice =
+                                      originalPriceVal > discountedPriceVal;
+
+                                  final price =
+                                      discountedPriceVal.toStringAsFixed(
+                                          discountedPriceVal % 1 == 0 ? 0 : 2);
+                                  final originalPrice =
+                                      originalPriceVal.toStringAsFixed(
+                                          originalPriceVal % 1 == 0 ? 0 : 2);
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 16),
+                                    child: GestureDetector(
                                       onTap: () {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (_) => OffersScreen(
-                                              selectedPromoId: promoId,
-                                            ),
+                                            builder: (_) => ProductDetailScreen(
+                                                product: product),
                                           ),
                                         );
                                       },
                                       child: Container(
-                                        decoration: const BoxDecoration(
-                                          border: Border(
-                                            bottom: BorderSide(
-                                              color: Color(0xFF070F0A),
-                                              width: 1.0,
-                                            ),
-                                          ),
+                                        width: 290,
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(28),
                                         ),
-                                        padding:
-                                            const EdgeInsets.only(bottom: 2),
-                                        child: Text(
-                                          'VIEW ALL',
-                                          style: GoogleFonts.manrope(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1.5,
-                                            color: const Color(0xFF070F0A),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (description.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    description,
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 13,
-                                      color: const Color(0xFF5E5E5B),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 415,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24),
-                              itemCount: promoProducts.length,
-                              itemBuilder: (context, index) {
-                                final item = promoProducts[index];
-                                final product = item['product'] as Product;
-                                final discountedPriceVal =
-                                    (item['discountedPrice'] as num).toDouble();
-                                final originalPriceVal =
-                                    item['originalPrice'] != null
-                                        ? (item['originalPrice'] as num)
-                                            .toDouble()
-                                        : product.price;
-
-                                final imageUrl = product.imageUrl;
-                                final name = product.name;
-                                final shortDesc = product
-                                        .shortDescription.isNotEmpty
-                                    ? product.shortDescription
-                                    : '${product.volume} ${product.category}';
-                                final discountLabel =
-                                    item['discountLabel']?.toString() ??
-                                        '-15% OFF';
-
-                                final price =
-                                    discountedPriceVal.toStringAsFixed(
-                                        discountedPriceVal % 1 == 0 ? 0 : 2);
-                                final originalPrice =
-                                    originalPriceVal.toStringAsFixed(
-                                        originalPriceVal % 1 == 0 ? 0 : 2);
-
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 16),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ProductDetailScreen(
-                                              product: product),
-                                        ),
-                                      );
-                                    },
-                                    child: Container(
-                                      width: 290,
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(28),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                            child: AspectRatio(
-                                              aspectRatio: 0.95,
-                                              child: Stack(
-                                                children: [
-                                                  Positioned.fill(
-                                                    child: imageUrl.isNotEmpty
-                                                        ? Image.network(
-                                                            imageUrl,
-                                                            fit: BoxFit.cover,
-                                                            errorBuilder:
-                                                                (_, __, ___) =>
-                                                                    Container(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              child: AspectRatio(
+                                                aspectRatio: 0.95,
+                                                child: Stack(
+                                                  children: [
+                                                    Positioned.fill(
+                                                      child: imageUrl.isNotEmpty
+                                                          ? Image.network(
+                                                              imageUrl,
+                                                              fit: BoxFit.cover,
+                                                              errorBuilder: (_,
+                                                                      __,
+                                                                      ___) =>
+                                                                  Container(
+                                                                color: const Color(
+                                                                    0xFFF2F4F0),
+                                                                child: Icon(
+                                                                  Icons
+                                                                      .spa_outlined,
+                                                                  color: AppTheme
+                                                                      .secondary,
+                                                                  size: 40,
+                                                                ),
+                                                              ),
+                                                            )
+                                                          : Container(
                                                               color: const Color(
                                                                   0xFFF2F4F0),
                                                               child: Icon(
@@ -1266,185 +1543,283 @@ class HomeScreen extends StatelessWidget {
                                                                 size: 40,
                                                               ),
                                                             ),
-                                                          )
-                                                        : Container(
-                                                            color: const Color(
-                                                                0xFFF2F4F0),
-                                                            child: Icon(
-                                                              Icons
-                                                                  .spa_outlined,
-                                                              color: AppTheme
-                                                                  .secondary,
-                                                              size: 40,
-                                                            ),
-                                                          ),
-                                                  ),
-                                                  Positioned(
-                                                    top: 12,
-                                                    left: 12,
-                                                    child: Container(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 6),
-                                                      decoration: BoxDecoration(
-                                                        color: Colors.black,
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(100),
-                                                      ),
-                                                      child: Text(
-                                                        discountLabel,
-                                                        style:
-                                                            GoogleFonts.manrope(
-                                                          color: Colors.white,
-                                                          fontSize: 9,
-                                                          fontWeight:
-                                                              FontWeight.w800,
-                                                          letterSpacing: 1.0,
-                                                        ),
-                                                      ),
                                                     ),
-                                                  ),
-                                                  if (product
-                                                          .availableStockQuantity >
-                                                      0)
-                                                    Positioned(
-                                                      bottom: 12,
-                                                      right: 12,
-                                                      child: GestureDetector(
-                                                        onTap: () =>
-                                                            _handlePromotionProductAdd(
-                                                                context,
-                                                                product),
+                                                    if (discountLabel
+                                                        .isNotEmpty)
+                                                      Positioned(
+                                                        top: 12,
+                                                        left: 12,
                                                         child: Container(
-                                                          width: 36,
-                                                          height: 36,
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .symmetric(
+                                                                  horizontal:
+                                                                      12,
+                                                                  vertical: 6),
                                                           decoration:
                                                               BoxDecoration(
-                                                            color: Colors.white
-                                                                .withValues(
-                                                                    alpha:
-                                                                        0.95),
-                                                            shape:
-                                                                BoxShape.circle,
-                                                            boxShadow: [
-                                                              BoxShadow(
-                                                                color: Colors
-                                                                    .black
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.08),
-                                                                blurRadius: 4,
-                                                                offset:
-                                                                    const Offset(
-                                                                        0, 2),
-                                                              ),
-                                                            ],
+                                                            color: Colors.black,
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        100),
                                                           ),
-                                                          child: const Icon(
-                                                            Icons.add,
-                                                            size: 20,
-                                                            color: Color(
-                                                                0xFF070F0A),
+                                                          child: Text(
+                                                            discountLabel,
+                                                            style: GoogleFonts
+                                                                .manrope(
+                                                              color:
+                                                                  Colors.white,
+                                                              fontSize: 9,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800,
+                                                              letterSpacing:
+                                                                  1.0,
+                                                            ),
                                                           ),
                                                         ),
                                                       ),
+                                                    if (product
+                                                            .availableStockQuantity >
+                                                        0)
+                                                      Positioned(
+                                                        bottom: 12,
+                                                        right: 12,
+                                                        child: GestureDetector(
+                                                          onTap: () =>
+                                                              _handlePromotionProductAdd(
+                                                                  context,
+                                                                  product),
+                                                          child: Container(
+                                                            width: 36,
+                                                            height: 36,
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: Colors
+                                                                  .white
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.95),
+                                                              shape: BoxShape
+                                                                  .circle,
+                                                              boxShadow: [
+                                                                BoxShadow(
+                                                                  color: Colors
+                                                                      .black
+                                                                      .withValues(
+                                                                          alpha:
+                                                                              0.08),
+                                                                  blurRadius: 4,
+                                                                  offset:
+                                                                      const Offset(
+                                                                          0, 2),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            child: const Icon(
+                                                              Icons.add,
+                                                              size: 20,
+                                                              color: Color(
+                                                                  0xFF070F0A),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 4),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    name,
+                                                    style:
+                                                        GoogleFonts.ebGaramond(
+                                                      fontSize: 18.5,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: const Color(
+                                                          0xFF070F0A),
+                                                      height: 1.2,
                                                     ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    shortDesc,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: GoogleFonts.manrope(
+                                                      fontSize: 12,
+                                                      color: const Color(
+                                                          0xFF7E807C),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 10),
+                                                  Row(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .baseline,
+                                                    textBaseline:
+                                                        TextBaseline.alphabetic,
+                                                    children: [
+                                                      Text(
+                                                        '\$$price',
+                                                        style:
+                                                            GoogleFonts.manrope(
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                          color: const Color(
+                                                              0xFF070F0A),
+                                                        ),
+                                                      ),
+                                                      if (showOriginalPrice) ...[
+                                                        const SizedBox(
+                                                            width: 8),
+                                                        Text(
+                                                          '\$$originalPrice',
+                                                          style: GoogleFonts
+                                                              .manrope(
+                                                            fontSize: 12,
+                                                            color: const Color(
+                                                                0xFF9E9E9E),
+                                                            decoration:
+                                                                TextDecoration
+                                                                    .lineThrough,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
                                                 ],
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 4),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  name,
-                                                  style: GoogleFonts.ebGaramond(
-                                                    fontSize: 18.5,
-                                                    fontWeight: FontWeight.bold,
-                                                    color:
-                                                        const Color(0xFF070F0A),
-                                                    height: 1.2,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  shortDesc,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: GoogleFonts.manrope(
-                                                    fontSize: 12,
-                                                    color:
-                                                        const Color(0xFF7E807C),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 10),
-                                                Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment
-                                                          .baseline,
-                                                  textBaseline:
-                                                      TextBaseline.alphabetic,
-                                                  children: [
-                                                    Text(
-                                                      '\$$price',
-                                                      style:
-                                                          GoogleFonts.manrope(
-                                                        fontSize: 14,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        color: const Color(
-                                                            0xFF070F0A),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      '\$$originalPrice',
-                                                      style:
-                                                          GoogleFonts.manrope(
-                                                        fontSize: 12,
-                                                        color: const Color(
-                                                            0xFF9E9E9E),
-                                                        decoration:
-                                                            TextDecoration
-                                                                .lineThrough,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+
+                if (appState.productsEnabled) ...[
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 24),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'All Products',
+                            style: GoogleFonts.ebGaramond(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF070F0A),
                             ),
                           ),
-                          const SizedBox(height: 32),
+                          Text(
+                            '${appState.homeProductsTotal} ITEMS',
+                            style: GoogleFonts.manrope(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.1,
+                              color: AppTheme.secondary,
+                            ),
+                          ),
                         ],
-                      );
-                    }).toList(),
+                      ),
+                    ),
                   ),
-                ),
+                  if (allProducts.isEmpty && appState.isLoadingHomeProducts)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (allProducts.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                        child: Text(
+                          'Products will appear here when available.',
+                          style: GoogleFonts.manrope(
+                            fontSize: 13,
+                            color: AppTheme.secondary,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.63,
+                          crossAxisSpacing: 14,
+                          mainAxisSpacing: 18,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => ProductCard(
+                            product: allProducts[index],
+                          ),
+                          childCount: allProducts.length,
+                        ),
+                      ),
+                    ),
+                  if (allProducts.isNotEmpty && appState.isLoadingHomeProducts)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
 
                 const SliverToBoxAdapter(
                   child: SizedBox(height: 120),
                 ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -1649,6 +2024,18 @@ class _BoutiqueCarouselState extends State<BoutiqueCarousel> {
           ),
         );
       }
+    } else if (targetType == 'preorder' && appState.productsEnabled) {
+      final productIndex = targetId.isEmpty
+          ? -1
+          : appState.products.indexWhere((p) => p.id.toString() == targetId);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => productIndex != -1
+              ? ProductDetailScreen(product: appState.products[productIndex])
+              : const PreordersScreen(),
+        ),
+      );
     } else if (targetType == 'category' &&
         targetId.isNotEmpty &&
         appState.categoriesEnabled) {

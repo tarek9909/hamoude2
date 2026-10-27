@@ -125,7 +125,7 @@ class ProductVariant {
   factory ProductVariant.fromJson(Map<String, dynamic> json) {
     final attributes =
         _productAttributes(json['attributes'] ?? json['variant_attributes']);
-    final name = (json['name'] ?? '').toString();
+    final name = (json['name'] ?? json['label'] ?? '').toString();
     final displayName =
         (json['variant_display_name'] ?? json['display_name'] ?? name)
             .toString()
@@ -138,8 +138,10 @@ class ProductVariant {
       sku: (json['sku'] ?? '').toString(),
       barcode: (json['barcode'] ?? '').toString(),
       price: _nullableDouble(json['price']),
-      stockQuantity:
-          _toDouble(json['stockQuantity'] ?? json['available_qty']).toInt(),
+      stockQuantity: _toDouble(json['stockQuantity'] ??
+              json['available_qty'] ??
+              json['stock_quantity'])
+          .toInt(),
       isDefault: _toBool(json['is_default'] ?? json['isDefault']),
       imageUrl: (json['image_url'] ?? json['imageUrl'] ?? '').toString(),
       colorHexes:
@@ -202,8 +204,16 @@ class Product {
   final List<ProductAttribute> attributes;
   final List<ProductImage> images;
   final List<ProductVariant> variants;
+
+  /// True when the payload carried a `variants` array (even an empty one).
+  /// Older list endpoints omit variants, so a missing array means "unknown",
+  /// not "this product has no variants".
+  final bool variantsLoaded;
   final String brand;
   final int sortOrder;
+
+  /// Whether [variants] reflects the backend's variant list for this product.
+  bool get hasVariantData => variantsLoaded || variants.isNotEmpty;
 
   int get availableStockQuantity {
     if (variants.isEmpty) {
@@ -272,11 +282,11 @@ class Product {
     required this.imageUrl,
     required this.category,
     required this.stockQuantity,
-    required this.rating,
-    required this.reviewsCount,
+    this.rating = 0.0,
+    this.reviewsCount = 0,
     required this.skinTypes,
     required this.ingredients,
-    required this.volume,
+    this.volume = '',
     this.measurementLabel = '',
     this.unitName = '',
     this.unitSymbol = '',
@@ -289,6 +299,7 @@ class Product {
     this.attributes = const [],
     this.images = const [],
     this.variants = const [],
+    this.variantsLoaded = false,
     required this.brand,
     this.sortOrder = 0,
   });
@@ -316,7 +327,7 @@ class Product {
     final unitSymbol = json['unit_symbol']?.toString() ?? '';
     final unitLabel = json['unit_label']?.toString() ?? '';
     final legacyVolume =
-        (json['volume'] ?? attributes['volume'])?.toString() ?? '50ml';
+        (json['volume'] ?? attributes['volume'])?.toString() ?? '';
     final measurementLabel = _measurementLabel(
         json, attributeList, unitSymbol, unitLabel, unitName, legacyVolume);
 
@@ -331,8 +342,11 @@ class Product {
       imageUrl: primaryImageUrl,
       category: category?.toString() ?? 'General',
       stockQuantity: _toDouble(stockQuantity).toInt(),
-      rating: (json['rating'] as num?)?.toDouble() ?? 4.5,
-      reviewsCount: (json['reviewsCount'] as num?)?.toInt() ?? 12,
+      rating: _toDouble(json['rating_average'] ?? json['rating']),
+      reviewsCount: _toDouble(json['rating_count'] ??
+              json['reviews_count'] ??
+              json['reviewsCount'])
+          .toInt(),
       skinTypes: _stringList(json['skinTypes'] ?? attributes['skin_types']) ??
           ['All Skintypes'],
       ingredients:
@@ -361,6 +375,7 @@ class Product {
                 ),
             ],
       variants: variants,
+      variantsLoaded: json['variants'] is List,
       brand: brandName?.toString() ?? '',
       sortOrder:
           _toDouble(json['sort_order'] ?? json['sortOrder'] ?? 0).toInt(),
@@ -396,7 +411,8 @@ class Product {
       'preorder_max_quantity': preorderMaxQuantity,
       'attributes': attributes.map((attribute) => attribute.toJson()).toList(),
       'images': images.map((image) => image.toJson()).toList(),
-      'variants': variants.map((variant) => variant.toJson()).toList(),
+      if (hasVariantData)
+        'variants': variants.map((variant) => variant.toJson()).toList(),
       'brand': brand,
       'sort_order': sortOrder,
     };
@@ -515,6 +531,7 @@ List<ProductVariant> _productVariants(
 
   return variants
       .whereType<Map>()
+      .where((item) => !_isInactiveVariant(item))
       .map((item) {
         final variant =
             ProductVariant.fromJson(Map<String, dynamic>.from(item));
@@ -543,6 +560,12 @@ List<ProductVariant> _productVariants(
       })
       .where((variant) => variant.id.isNotEmpty)
       .toList();
+}
+
+bool _isInactiveVariant(Map item) {
+  final raw = item['is_active'] ?? item['variant_is_active'];
+  if (raw == null) return false;
+  return !_toBool(raw);
 }
 
 List<String> _hexColorList(dynamic value) {

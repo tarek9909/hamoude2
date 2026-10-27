@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+// http_parser ships with package:http; MediaType is needed so multipart
+// uploads carry the real MIME type the backend validates.
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../models/product.dart';
 
@@ -98,13 +102,37 @@ class StoreBranding {
 }
 
 class StorefrontApiException implements Exception {
+  static const expiredTokenMessage = 'Invalid or expired customer token';
+
   final String message;
   final int? statusCode;
 
   const StorefrontApiException(this.message, {this.statusCode});
 
+  /// True when the backend rejected the customer token (expired, revoked or
+  /// invalid). Only meaningful for requests that carried a customer session.
+  bool get isSessionExpired {
+    if (statusCode == 401) return true;
+    return statusCode == 403 &&
+        message.toLowerCase().contains(expiredTokenMessage.toLowerCase());
+  }
+
   @override
   String toString() => message;
+}
+
+class ProductPage {
+  final List<Product> items;
+  final int page;
+  final int total;
+  final bool hasMore;
+
+  const ProductPage({
+    required this.items,
+    required this.page,
+    required this.total,
+    required this.hasMore,
+  });
 }
 
 class BranchHour {
@@ -163,10 +191,42 @@ class CustomerSession {
   final int customerId;
   final String customerToken;
 
+  /// When the backend says the token stops working, if known.
+  final DateTime? expiresAt;
+
   const CustomerSession({
     required this.customerId,
     required this.customerToken,
+    this.expiresAt,
   });
+
+  bool get isExpired =>
+      expiresAt != null && !expiresAt!.isAfter(DateTime.now().toUtc());
+
+  CustomerSession copyWith({String? customerToken, DateTime? expiresAt}) {
+    return CustomerSession(
+      customerId: customerId,
+      customerToken: customerToken ?? this.customerToken,
+      expiresAt: expiresAt ?? this.expiresAt,
+    );
+  }
+
+  factory CustomerSession.fromAuthData(Map<String, dynamic> data) {
+    final customer = (data['customer'] as Map<String, dynamic>?) ?? {};
+    return CustomerSession(
+      customerId: (customer['id'] as num?)?.toInt() ??
+          int.tryParse(customer['id']?.toString() ?? '') ??
+          0,
+      customerToken:
+          (data['customer_token'] ?? data['token'])?.toString() ?? '',
+      expiresAt: parseExpiry(data['token_expires_at']),
+    );
+  }
+
+  static DateTime? parseExpiry(dynamic value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    return parsed?.toUtc();
+  }
 }
 
 class StorefrontApi {
@@ -174,6 +234,13 @@ class StorefrontApi {
     'STORE_SLUG',
     defaultValue: 'skin-cella',
   );
+
+  static const defaultTimeout = Duration(seconds: 8);
+
+  /// Checkout can take longer than a normal read; the idempotency key makes a
+  /// retry after a timeout safe.
+  static const checkoutTimeout = Duration(seconds: 30);
+  static const uploadTimeout = Duration(seconds: 60);
 
   final String baseUrl;
   final String storeSlug;
@@ -313,6 +380,7 @@ class StorefrontApi {
     Map<String, dynamic>? body,
     CustomerSession? session,
     String? wholesaleToken,
+    Duration timeout = defaultTimeout,
   }) async {
     final headers = <String, String>{
       'Accept': 'application/json',
@@ -321,29 +389,217 @@ class StorefrontApi {
       if (wholesaleToken != null) 'x-wholesale-token': wholesaleToken,
     };
 
-    final response = await _client
-        .send(
-          http.Request(method, _uri(path, query))
-            ..headers.addAll(headers)
-            ..body = body == null ? '' : json.encode(body),
-        )
-        .timeout(const Duration(seconds: 8));
+    final request = http.Request(method, _uri(path, query))
+      ..headers.addAll(headers)
+      ..body = body == null ? '' : json.encode(body);
+    return _send(request, timeout);
+  }
 
-    final text = await response.stream.bytesToString();
-    final payload = text.isEmpty
-        ? <String, dynamic>{}
-        : json.decode(text) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> _send(
+    http.BaseRequest request,
+    Duration timeout,
+  ) async {
+    final int statusCode;
+    final String text;
+    try {
+      final response = await _client.send(request).timeout(timeout);
+      statusCode = response.statusCode;
+      text = await response.stream.bytesToString().timeout(timeout);
+    } on TimeoutException {
+      throw const StorefrontApiException(
+          'The store took too long to respond. Check your connection and try again.');
+    } on http.ClientException {
+      throw const StorefrontApiException(
+          'Could not reach the store. Check your connection and try again.');
+    }
+    return _decodeResponse(statusCode, text);
+  }
 
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300 ||
-        payload['success'] == false) {
-      throw StorefrontApiException(
-        payload['message']?.toString() ?? 'Storefront API request failed.',
-        statusCode: response.statusCode,
-      );
+  /// Turns any response into a JSON payload or a [StorefrontApiException].
+  /// HTML error pages (proxy 502/504) never surface as a FormatException.
+  Map<String, dynamic> _decodeResponse(int statusCode, String text) {
+    Map<String, dynamic>? payload;
+    if (text.trim().isEmpty) {
+      payload = <String, dynamic>{};
+    } else {
+      try {
+        final decoded = json.decode(text);
+        if (decoded is Map<String, dynamic>) {
+          payload = decoded;
+        }
+      } on FormatException {
+        payload = null;
+      }
     }
 
+    final ok = statusCode >= 200 && statusCode < 300;
+    if (payload == null) {
+      throw StorefrontApiException(
+        _fallbackErrorMessage(statusCode, ok),
+        statusCode: statusCode,
+      );
+    }
+    if (!ok || payload['success'] == false) {
+      final message = payload['message']?.toString().trim() ?? '';
+      throw StorefrontApiException(
+        message.isNotEmpty ? message : _fallbackErrorMessage(statusCode, ok),
+        statusCode: statusCode,
+      );
+    }
     return payload;
+  }
+
+  static String _fallbackErrorMessage(int statusCode, bool ok) {
+    if (ok) {
+      return 'The store sent an unexpected response. Please try again.';
+    }
+    if (statusCode == 502 || statusCode == 503 || statusCode == 504) {
+      return 'The store is temporarily unavailable. Please try again shortly.';
+    }
+    if (statusCode == 413) {
+      return 'That file is too large to upload.';
+    }
+    if (statusCode == 429) {
+      return 'Too many requests. Please wait a moment and try again.';
+    }
+    return 'Storefront API request failed.';
+  }
+
+  /// Parses product rows. Older wholesale catalogs return one row per
+  /// variant (same `id`, different `variant_id`); those rows are merged into a
+  /// single product with a `variants` array so every cart line keeps its
+  /// variant id.
+  List<Product> _parseProducts(List data) {
+    final rows = data
+        .whereType<Map<String, dynamic>>()
+        .map(_normalizeMediaUrls)
+        .toList();
+    final merged = <String, Map<String, dynamic>>{};
+    final order = <String>[];
+    for (final row in rows) {
+      final id = row['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      final variantId = row['variant_id']?.toString() ?? '';
+      final isVariantRow = variantId.isNotEmpty && row['variants'] is! List;
+      final existing = merged[id];
+      if (existing == null) {
+        final copy = Map<String, dynamic>.from(row);
+        if (isVariantRow) {
+          copy['variants'] = [_variantFromRow(row)];
+          copy['available_qty'] = _num(row['available_qty']);
+        }
+        merged[id] = copy;
+        order.add(id);
+      } else if (isVariantRow && existing['variants'] is List) {
+        (existing['variants'] as List).add(_variantFromRow(row));
+        existing['available_qty'] =
+            _num(existing['available_qty']) + _num(row['available_qty']);
+      }
+    }
+    return order
+        .map((id) => Product.fromJson(merged[id]!))
+        .where((product) => product.id.isNotEmpty)
+        .toList();
+  }
+
+  static Map<String, dynamic> _variantFromRow(Map<String, dynamic> row) => {
+        'id': row['variant_id'],
+        'name': row['variant_name'] ?? row['display_name'] ?? row['name'],
+        'variant_display_name': row['variant_name'] ?? row['display_name'],
+        'sku': row['sku'],
+        'barcode': row['barcode'],
+        'price': row['price'],
+        'available_qty': row['available_qty'],
+        'image_url': row['image_url'],
+      };
+
+  static double _num(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0.0;
+  }
+
+  Future<ProductPage> listProductsPage({
+    required int page,
+    int perPage = 20,
+    int? branchId,
+    String? wholesaleToken,
+    bool excludePreorder = false,
+  }) async {
+    final payload = await _request(
+      wholesaleToken != null ? 'wholesale/products' : 'products',
+      wholesaleToken: wholesaleToken,
+      query: {
+        'page': page,
+        'per_page': perPage,
+        if (branchId != null) 'branch_id': branchId,
+        if (excludePreorder) 'exclude_preorder': 1,
+      },
+    );
+    final data = payload['data'];
+    final items = data is List ? _parseProducts(data) : <Product>[];
+
+    final meta = payload['meta'];
+    final total =
+        meta is Map ? int.tryParse(meta['total']?.toString() ?? '') : null;
+    final totalPages = meta is Map
+        ? int.tryParse(meta['total_pages']?.toString() ?? '')
+        : null;
+
+    return ProductPage(
+      items: items,
+      page: page,
+      total: total ?? items.length,
+      hasMore: totalPages != null
+          ? page < totalPages
+          : (data is List && data.length >= perPage),
+    );
+  }
+
+  Future<List<Product>> _listProductPages(
+    String path, {
+    int? branchId,
+    String? search,
+    String? categoryId,
+    String? wholesaleToken,
+  }) async {
+    const perPage = 100;
+    final rows = <dynamic>[];
+    var page = 1;
+
+    while (true) {
+      final payload = await _request(
+        path,
+        wholesaleToken: wholesaleToken,
+        query: {
+          'page': page,
+          'per_page': perPage,
+          if (branchId != null) 'branch_id': branchId,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (categoryId != null && categoryId.isNotEmpty)
+            'category_id': categoryId,
+        },
+      );
+      final data = payload['data'];
+      if (data is! List) {
+        break;
+      }
+
+      rows.addAll(data);
+
+      final meta = payload['meta'];
+      final totalPages = meta is Map
+          ? int.tryParse(meta['total_pages']?.toString() ?? '')
+          : null;
+      if (totalPages != null) {
+        if (page >= totalPages) break;
+      } else if (data.length < perPage) {
+        break;
+      }
+
+      page++;
+    }
+
+    return _parseProducts(rows);
   }
 
   Future<Map<String, dynamic>> getConfig() async {
@@ -367,28 +623,13 @@ class StorefrontApi {
     String? search,
     String? categoryId,
   }) async {
-    final payload = await _request(
+    return _listProductPages(
       'wholesale/products',
       wholesaleToken: wholesaleToken,
-      query: {
-        'per_page': 100,
-        if (branchId != null) 'branch_id': branchId,
-        if (search != null && search.isNotEmpty) 'search': search,
-        if (categoryId != null && categoryId.isNotEmpty)
-          'category_id': categoryId,
-      },
+      branchId: branchId,
+      search: search,
+      categoryId: categoryId,
     );
-    final data = payload['data'];
-    if (data is! List) {
-      return [];
-    }
-
-    return data
-        .whereType<Map<String, dynamic>>()
-        .map(_normalizeMediaUrls)
-        .map(Product.fromJson)
-        .where((product) => product.id.isNotEmpty)
-        .toList();
   }
 
   Future<Map<String, dynamic>> checkoutWholesale({
@@ -402,6 +643,7 @@ class StorefrontApi {
     int? deliveryZoneId,
     String? notes,
     String? pickupTime,
+    String? idempotencyKey,
   }) async {
     final session = customerId != null && customerToken != null
         ? CustomerSession(customerId: customerId, customerToken: customerToken)
@@ -411,11 +653,12 @@ class StorefrontApi {
       method: 'POST',
       session: session,
       wholesaleToken: wholesaleToken,
+      timeout: checkoutTimeout,
       body: {
         'branch_id': branchId,
         'order_type': orderType,
         'payment_method': 'cod',
-        'idempotency_key':
+        'idempotency_key': idempotencyKey ??
             '$storeSlug-wholesale-${DateTime.now().millisecondsSinceEpoch}',
         if (customerId != null) 'customer_id': customerId,
         if (deliveryAddressId != null) 'delivery_address_id': deliveryAddressId,
@@ -469,32 +712,17 @@ class StorefrontApi {
     String? search,
     String? categoryId,
   }) async {
-    final payload = await _request(
+    return _listProductPages(
       'products',
-      query: {
-        'per_page': 100,
-        if (branchId != null) 'branch_id': branchId,
-        if (search != null && search.isNotEmpty) 'search': search,
-        if (categoryId != null && categoryId.isNotEmpty)
-          'category_id': categoryId,
-      },
+      branchId: branchId,
+      search: search,
+      categoryId: categoryId,
     );
-    final data = payload['data'];
-    if (data is! List) {
-      return [];
-    }
-
-    return data
-        .whereType<Map<String, dynamic>>()
-        .map(_normalizeMediaUrls)
-        .map(Product.fromJson)
-        .where((product) => product.id.isNotEmpty)
-        .toList();
   }
 
   Future<Product?> getProduct(String productId, {int? branchId}) async {
     final payload = await _request(
-      'products/$productId',
+      'products/${Uri.encodeComponent(productId)}',
       query: {if (branchId != null) 'branch_id': branchId},
     );
     final data = payload['data'];
@@ -536,10 +764,14 @@ class StorefrontApi {
     required List<CartItem> items,
     String orderType = 'delivery',
     int? deliveryZoneId,
+    CustomerSession? session,
+    String? wholesaleToken,
   }) async {
     final payload = await _request(
-      'cart/quote',
+      wholesaleToken != null ? 'wholesale/cart/quote' : 'cart/quote',
       method: 'POST',
+      session: session,
+      wholesaleToken: wholesaleToken,
       body: {
         'branch_id': branchId,
         'order_type': orderType,
@@ -560,6 +792,7 @@ class StorefrontApi {
     int? deliveryZoneId,
     String? notes,
     String? pickupTime,
+    String? idempotencyKey,
   }) async {
     final session = customerId != null && customerToken != null
         ? CustomerSession(customerId: customerId, customerToken: customerToken)
@@ -568,11 +801,12 @@ class StorefrontApi {
       'checkout',
       method: 'POST',
       session: session,
+      timeout: checkoutTimeout,
       body: {
         'branch_id': branchId,
         'order_type': orderType,
         'payment_method': 'cod',
-        'idempotency_key':
+        'idempotency_key': idempotencyKey ??
             '$storeSlug-${DateTime.now().millisecondsSinceEpoch}',
         if (customerId != null) 'customer_id': customerId,
         if (deliveryAddressId != null) 'delivery_address_id': deliveryAddressId,
@@ -600,13 +834,20 @@ class StorefrontApi {
     return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
+  /// Asks the store to reset a password. Usernames go to admin review;
+  /// emails use the OTP flow. The returned map is `data` plus the server
+  /// `message`.
   Future<Map<String, dynamic>> requestPasswordReset(String identifier) async {
+    final value = identifier.trim();
     final payload = await _request(
       'auth/password-reset-request',
       method: 'POST',
-      body: {'identifier': identifier},
+      body: value.contains('@') ? {'email': value} : {'username': value},
     );
-    return (payload['data'] as Map<String, dynamic>?) ?? {};
+    return {
+      ...((payload['data'] as Map<String, dynamic>?) ?? {}),
+      if (payload['message'] != null) 'message': payload['message'].toString(),
+    };
   }
 
   Future<CustomerSession> verifyOtp({
@@ -626,11 +867,7 @@ class StorefrontApi {
       },
     );
     final data = (payload['data'] as Map<String, dynamic>?) ?? {};
-    final customer = (data['customer'] as Map<String, dynamic>?) ?? {};
-    return CustomerSession(
-      customerId: (customer['id'] as num?)?.toInt() ?? 0,
-      customerToken: data['customer_token']?.toString() ?? '',
-    );
+    return CustomerSession.fromAuthData(data);
   }
 
   Future<List<Map<String, dynamic>>> listOrders(CustomerSession session) async {
@@ -719,6 +956,15 @@ class StorefrontApi {
     );
   }
 
+  Future<void> markAllNotificationsRead(CustomerSession session) async {
+    await _request(
+      'notifications/read-all',
+      method: 'POST',
+      session: session,
+      body: const {},
+    );
+  }
+
   Future<void> markNotificationClicked({
     required String notificationId,
     required CustomerSession session,
@@ -740,19 +986,38 @@ class StorefrontApi {
     return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
+  /// `PATCH me` accepts only `full_name` and `phone`.
   Future<Map<String, dynamic>> updateProfile({
     required CustomerSession session,
     required String name,
-    String? password,
+    String? phone,
   }) async {
     final payload = await _request(
       'me',
       method: 'PATCH',
       session: session,
       body: {
-        'customer_id': session.customerId,
         'full_name': name,
-        if (password != null && password.isNotEmpty) 'password': password,
+        if (phone != null) 'phone': phone,
+      },
+    );
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
+  }
+
+  /// Changes the password after verifying the current one. The response may
+  /// carry a rotated `token` and `token_expires_at`.
+  Future<Map<String, dynamic>> changePassword({
+    required CustomerSession session,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final payload = await _request(
+      'me/change-password',
+      method: 'POST',
+      session: session,
+      body: {
+        'current_password': currentPassword,
+        'new_password': newPassword,
       },
     );
     return (payload['data'] as Map<String, dynamic>?) ?? {};
@@ -771,11 +1036,7 @@ class StorefrontApi {
       },
     );
     final data = (payload['data'] as Map<String, dynamic>?) ?? {};
-    final customer = (data['customer'] as Map<String, dynamic>?) ?? {};
-    return CustomerSession(
-      customerId: (customer['id'] as num?)?.toInt() ?? 0,
-      customerToken: data['customer_token']?.toString() ?? '',
-    );
+    return CustomerSession.fromAuthData(data);
   }
 
   Future<CustomerSession> registerWithUsernamePassword({
@@ -797,11 +1058,7 @@ class StorefrontApi {
       },
     );
     final data = (payload['data'] as Map<String, dynamic>?) ?? {};
-    final customer = (data['customer'] as Map<String, dynamic>?) ?? {};
-    return CustomerSession(
-      customerId: (customer['id'] as num?)?.toInt() ?? 0,
-      customerToken: data['customer_token']?.toString() ?? '',
-    );
+    return CustomerSession.fromAuthData(data);
   }
 
   Future<void> logout(CustomerSession session) async {
@@ -813,35 +1070,87 @@ class StorefrontApi {
     );
   }
 
-  Future<void> deleteAccount(CustomerSession session) async {
+  /// Deletes the account, confirmed with the customer's password (username
+  /// accounts) or an email OTP verification token.
+  Future<void> deleteAccount(
+    CustomerSession session, {
+    String? password,
+    String? verificationToken,
+  }) async {
     await _request(
       'me',
       method: 'DELETE',
       session: session,
-      body: {'customer_id': session.customerId},
+      body: {
+        if (password != null) 'password': password,
+        if (verificationToken != null) 'verification_token': verificationToken,
+      },
     );
+  }
+
+  /// MIME type for an upload, from its file name. Defaults to JPEG for
+  /// images picked without an extension.
+  static String mimeTypeForFilename(String filename) {
+    final dot = filename.lastIndexOf('.');
+    final extension = dot >= 0 ? filename.substring(dot + 1).toLowerCase() : '';
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'pdf':
+        return 'application/pdf';
+      case 'txt':
+        return 'text/plain';
+      case 'doc':
+        return 'application/msword';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  Future<Map<String, dynamic>> _uploadBytes({
+    required String path,
+    required String field,
+    required List<int> bytes,
+    required String filename,
+    required CustomerSession session,
+    String? mimeType,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path))
+      ..headers.addAll({
+        'Accept': 'application/json',
+        'x-customer-token': session.customerToken,
+        'Authorization': 'Bearer ${session.customerToken}',
+      })
+      ..files.add(http.MultipartFile.fromBytes(
+        field,
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(mimeType ?? mimeTypeForFilename(filename)),
+      ));
+    final payload = await _send(request, uploadTimeout);
+    return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
   Future<Map<String, dynamic>> uploadProfileImage({
     required CustomerSession session,
-    required String filePath,
-  }) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl/$storeSlug/me/profile-image'),
+    required List<int> bytes,
+    required String filename,
+    String? mimeType,
+  }) {
+    return _uploadBytes(
+      path: 'me/profile-image',
+      field: 'image',
+      bytes: bytes,
+      filename: filename,
+      mimeType: mimeType,
+      session: session,
     );
-    request.headers['x-customer-token'] = session.customerToken;
-    request.fields['customer_id'] = session.customerId.toString();
-    request.files.add(await http.MultipartFile.fromPath('image', filePath));
-    final response = await http.Response.fromStream(await request.send());
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw StorefrontApiException(
-        'Profile picture upload failed.',
-        statusCode: response.statusCode,
-      );
-    }
-    final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
   Future<Map<String, dynamic>> removeProfileImage(
@@ -966,33 +1275,19 @@ class StorefrontApi {
   }
 
   Future<Map<String, dynamic>> uploadSupportAttachment({
-    required String filePath,
+    required List<int> bytes,
     required String filename,
     required CustomerSession session,
-  }) async {
-    final uri = Uri.parse('$baseUrl/$storeSlug/support/uploads');
-    final request = http.MultipartRequest('POST', uri);
-
-    request.headers['Authorization'] = 'Bearer ${session.customerToken}';
-
-    final multipartFile = await http.MultipartFile.fromPath(
-      'attachment',
-      filePath,
+    String? mimeType,
+  }) {
+    return _uploadBytes(
+      path: 'support/uploads',
+      field: 'attachment',
+      bytes: bytes,
       filename: filename,
+      mimeType: mimeType,
+      session: session,
     );
-    request.files.add(multipartFile);
-
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw StorefrontApiException(
-        'Upload failed with status ${response.statusCode}: ${response.body}',
-      );
-    }
-
-    final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    return (payload['data'] as Map<String, dynamic>?) ?? {};
   }
 
   Future<List<Map<String, dynamic>>> listSupportTickets(

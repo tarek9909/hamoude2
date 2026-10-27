@@ -14,8 +14,37 @@ import 'live_support_screen.dart';
 import 'profile_screen.dart'; // For TicketThreadScreen
 import 'track_order_screen.dart';
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  bool _isMarkingAllRead = false;
+
+  Future<void> _markAllRead(AppState appState) async {
+    if (_isMarkingAllRead) return;
+    setState(() => _isMarkingAllRead = true);
+    try {
+      await appState.markAllNotificationsRead();
+      if (mounted) {
+        showTopToast(context, 'Marked all as read');
+      }
+    } catch (e) {
+      if (mounted) {
+        showTopToast(
+          context,
+          userFacingError(e, fallback: 'Unable to mark notifications as read.'),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isMarkingAllRead = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,14 +78,8 @@ class NotificationsScreen extends StatelessWidget {
         actions: [
           if (notifications.isNotEmpty && hasUnread)
             TextButton(
-              onPressed: () {
-                for (var n in notifications) {
-                  if (n['isRead'] != true) {
-                    appState.markNotificationRead(n['id']);
-                  }
-                }
-                showTopToast(context, 'Marked all as read');
-              },
+              onPressed:
+                  _isMarkingAllRead ? null : () => _markAllRead(appState),
               child: Text(
                 'Mark all read',
                 style: GoogleFonts.manrope(
@@ -257,14 +280,12 @@ class NotificationsScreen extends StatelessWidget {
                                       context, 'Bundle is no longer available');
                                 }
                               } else if (actionType == 'url') {
-                                Navigator.push(
+                                // Only https links are opened; anything else
+                                // is rejected with a toast.
+                                PoliciesWebViewScreen.open(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (_) => PoliciesWebViewScreen(
-                                      title: title,
-                                      url: actionValue,
-                                    ),
-                                  ),
+                                  title: title,
+                                  url: actionValue,
                                 );
                               } else if (actionType == 'support' ||
                                   actionType == 'support_reply') {

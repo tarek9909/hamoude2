@@ -20,6 +20,7 @@ String _formatAmount(double value) {
 
 double _discountedPrice(
     double original, String discountType, double discountVal) {
+  if (discountVal <= 0) return original;
   if (discountType == 'percentage') {
     return original * (1 - discountVal / 100);
   }
@@ -46,17 +47,22 @@ class PromotionDetailScreen extends StatelessWidget {
 
     final description = promotion['description']?.toString() ?? "";
 
-    final imageUrl = promotion['image_url']?.toString() ??
-        promotion['media_url']?.toString() ??
-        "";
+    final imageUrl = appState.api.resolveMediaUrl(
+        promotion['image_url']?.toString() ??
+            promotion['media_url']?.toString());
 
     final explicitPromoPrice = _parseAmount(promotion['price']);
     final explicitOriginalPrice = _parseAmount(promotion['original_price']) ??
         _parseAmount(promotion['compare_at_price']);
 
     final discountType = promotion['discount_type']?.toString() ?? "percentage";
-    final discountVal =
-        (promotion['discount_value'] as num?)?.toDouble() ?? 20.0;
+    // No invented fallback: without a discount value there is no discount.
+    final discountVal = _parseAmount(promotion['discount_value']) ?? 0.0;
+    final discountBadge = discountVal <= 0
+        ? ''
+        : discountType == 'percentage'
+            ? '${discountVal.toStringAsFixed(0)}% OFF'
+            : '\$${_formatAmount(discountVal)} OFF';
 
     // Resolve matching products
     final rawItems = promotion['product_links'] as List? ?? [];
@@ -170,9 +176,7 @@ class PromotionDetailScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          discountType == 'percentage'
-                              ? '${discountVal.toStringAsFixed(0)}% OFF'
-                              : 'FIXED DISCOUNT',
+                          discountBadge,
                           style: GoogleFonts.manrope(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -295,8 +299,12 @@ class PromotionDetailScreen extends StatelessWidget {
 
                       final formattedPrice =
                           discPrice.toStringAsFixed(discPrice % 1 == 0 ? 0 : 2);
-                      final formattedOriginalPrice = product.price
-                          .toStringAsFixed(product.price % 1 == 0 ? 0 : 2);
+                      final formattedOriginalPrice = discPrice < product.price
+                          ? product.price
+                              .toStringAsFixed(product.price % 1 == 0 ? 0 : 2)
+                          : null;
+                      final productImageUrl =
+                          appState.api.resolveMediaUrl(product.imageUrl);
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -315,9 +323,9 @@ class PromotionDetailScreen extends StatelessWidget {
                             child: SizedBox(
                               width: 60,
                               height: 60,
-                              child: product.imageUrl.isNotEmpty
+                              child: productImageUrl.isNotEmpty
                                   ? Image.network(
-                                      product.imageUrl,
+                                      productImageUrl,
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => Container(
                                         color: const Color(0xFFF2F4F0),
@@ -375,15 +383,17 @@ class PromotionDetailScreen extends StatelessWidget {
                                       color: const Color(0xFF070F0A),
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '\$$formattedOriginalPrice',
-                                    style: GoogleFonts.manrope(
-                                      fontSize: 11,
-                                      color: const Color(0xFF9E9E9E),
-                                      decoration: TextDecoration.lineThrough,
+                                  if (formattedOriginalPrice != null) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '\$$formattedOriginalPrice',
+                                      style: GoogleFonts.manrope(
+                                        fontSize: 11,
+                                        color: const Color(0xFF9E9E9E),
+                                        decoration: TextDecoration.lineThrough,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ],
@@ -434,6 +444,7 @@ class PromotionDetailScreen extends StatelessWidget {
                   ? null
                   : () {
                       var addedCount = 0;
+                      String? firstBlockReason;
                       var skippedVariantCount = 0;
                       for (final product in matchingProducts) {
                         if (product.variants.length > 1) {
@@ -443,8 +454,13 @@ class PromotionDetailScreen extends StatelessWidget {
                         final variant = product.variants.length == 1
                             ? product.variants.first
                             : null;
-                        if (appState.addToCart(product, variant: variant)) {
+                        final blockReason =
+                            appState.cartAddBlockReason(product, 1, variant);
+                        if (blockReason == null &&
+                            appState.addToCart(product, variant: variant)) {
                           addedCount++;
+                        } else {
+                          firstBlockReason ??= blockReason;
                         }
                       }
 
@@ -455,8 +471,9 @@ class PromotionDetailScreen extends StatelessWidget {
                             : addedCount == matchingProducts.length
                                 ? 'Offer items added to bag.'
                                 : addedCount > 0
-                                    ? 'Some offer items were added; others are out of stock.'
-                                    : 'Offer items are out of stock.',
+                                    ? 'Some offer items were added. ${firstBlockReason ?? 'Others are out of stock.'}'
+                                    : firstBlockReason ??
+                                        'Offer items are out of stock.',
                       );
                     },
               style: ElevatedButton.styleFrom(

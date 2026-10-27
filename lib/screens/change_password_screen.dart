@@ -27,31 +27,30 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   Future<void> _handleSave() async {
+    if (_isSaving) return;
     final appState = Provider.of<AppState>(context, listen: false);
-    final hasCurrentPassword = appState.accountPassword != null &&
-        appState.accountPassword!.isNotEmpty;
     final currentPassword = _currentPasswordController.text;
     final password = _passwordController.text;
     final confirm = _confirmPasswordController.text;
 
-    if (hasCurrentPassword) {
-      if (currentPassword.isEmpty) {
-        showTopToast(context, 'Please enter your current password.');
-        return;
-      }
-      if (currentPassword != appState.accountPassword) {
-        showTopToast(context, 'Incorrect current password.');
-        return;
-      }
+    if (currentPassword.isEmpty) {
+      showTopToast(context, 'Please enter your current password.');
+      return;
     }
 
     if (password.isEmpty) {
-      showTopToast(context, 'Please enter a new password / PIN.');
+      showTopToast(context, 'Please enter a new password.');
       return;
     }
 
     if (password.length < 8) {
       showTopToast(context, 'New password must be at least 8 characters.');
+      return;
+    }
+
+    if (password == currentPassword) {
+      showTopToast(
+          context, 'Your new password must differ from the current one.');
       return;
     }
 
@@ -63,14 +62,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _isSaving = true);
 
     try {
-      await appState.updatePassword(password);
+      await appState.changePassword(
+        currentPassword: currentPassword,
+        newPassword: password,
+      );
       if (mounted) {
         showTopToast(context, 'Account password updated successfully!');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        showTopToast(context, 'Failed to update password: $e');
+        showTopToast(
+          context,
+          userFacingError(e,
+              fallback: 'Unable to update your password. Please try again.'),
+        );
       }
     } finally {
       if (mounted) {
@@ -82,9 +88,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final appState = Provider.of<AppState>(context);
-    final hasCurrentPassword = appState.accountPassword != null &&
-        appState.accountPassword!.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -142,38 +145,36 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (hasCurrentPassword) ...[
-                      Text(
-                        'CURRENT PASSWORD',
-                        style: GoogleFonts.manrope(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
-                          letterSpacing: 1.0,
-                        ),
+                    Text(
+                      'CURRENT PASSWORD',
+                      style: GoogleFonts.manrope(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary,
+                        letterSpacing: 1.0,
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _currentPasswordController,
-                        obscureText: true,
-                        style: GoogleFonts.manrope(
-                            fontSize: 13, color: AppTheme.primary),
-                        decoration: InputDecoration(
-                          hintText: 'Enter current password',
-                          prefixIcon: Icon(Icons.lock_open_outlined,
-                              size: 18, color: AppTheme.secondary),
-                        ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _currentPasswordController,
+                      obscureText: true,
+                      style: GoogleFonts.manrope(
+                          fontSize: 13, color: AppTheme.primary),
+                      decoration: InputDecoration(
+                        hintText: 'Enter current password',
+                        prefixIcon: Icon(Icons.lock_open_outlined,
+                            size: 18, color: AppTheme.secondary),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Forgot your password? Contact the store so an authorized staff member can reset it.',
-                        style: GoogleFonts.manrope(
-                          fontSize: 11,
-                          color: AppTheme.secondary,
-                        ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Forgot your password? Sign out and use "Forgot password?" on the sign-in screen to ask the store for a reset.',
+                      style: GoogleFonts.manrope(
+                        fontSize: 11,
+                        color: AppTheme.secondary,
                       ),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
+                    const SizedBox(height: 20),
                     Text(
                       'NEW ACCOUNT PASSWORD',
                       style: GoogleFonts.manrope(

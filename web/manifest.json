@@ -1,9 +1,9 @@
 {
-  "name": "Storefront Template",
-  "short_name": "Storefront",
+  "name": "Skin Cella",
+  "short_name": "Skin Cella",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#F8FAF5",
   "theme_color": "#061008",
-  "description": "Universal customer storefront template driven by store slug configuration."
+  "description": "Skin Cella skincare store: shop products, track orders and get expert consultations."
 }

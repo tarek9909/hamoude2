@@ -1,10 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart' show XFile;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/cart_quote.dart';
+import '../models/delivery_zone.dart';
 import '../models/product.dart';
 import '../services/storefront_api.dart';
+
+export '../models/cart_quote.dart';
+export '../models/delivery_zone.dart';
+
+const sessionExpiredNotice = 'Your session expired. Please sign in again.';
 
 String normalizeFullName(String value) {
   final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -76,6 +85,13 @@ class AppOrder {
   final String address;
   final String fulfillmentMode;
   final String preorderEtaText;
+  final String splitFromOrderNumber;
+
+  /// The branch the order belongs to (pickup location for pickup orders).
+  final String branchName;
+
+  /// The customer's own note for the store, if any.
+  final String notes;
 
   AppOrder({
     required this.id,
@@ -90,6 +106,9 @@ class AppOrder {
     required this.address,
     this.fulfillmentMode = 'standard',
     this.preorderEtaText = '',
+    this.splitFromOrderNumber = '',
+    this.branchName = '',
+    this.notes = '',
   });
 }
 
@@ -158,6 +177,14 @@ class CustomerAddress {
     ].where((part) => part.trim().isNotEmpty).toList();
     return parts.join(', ');
   }
+
+  /// The street address without the label, e.g. for order summaries.
+  String get formattedAddress {
+    return [addressLine1, addressLine2, city, state, postalCode, country]
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+  }
 }
 
 class OrderTimelineStep {
@@ -189,9 +216,13 @@ class OrderTimelineStep {
   }
 }
 
-class AppState extends ChangeNotifier {
+class AppState extends ChangeNotifier with WidgetsBindingObserver {
   final StorefrontApi api;
   final bool allowMockCheckoutFallback;
+  static const _catalogRefreshInterval = Duration(seconds: 60);
+  Timer? _catalogRefreshTimer;
+  DateTime? _lastAutomaticCatalogRefresh;
+  bool _isAutomaticCatalogRefreshRunning = false;
 
   AppState({
     StorefrontApi? api,
@@ -202,6 +233,12 @@ class AppState extends ChangeNotifier {
       defaultValue: false,
     ),
   }) : api = api ?? StorefrontApi() {
+    WidgetsBinding.instance.addObserver(this);
+    _catalogRefreshTimer = Timer.periodic(_catalogRefreshInterval, (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        _onPeriodicRefresh();
+      }
+    });
     if (initialBranding != null) {
       _branding = initialBranding;
     }
@@ -215,6 +252,22 @@ class AppState extends ChangeNotifier {
 
   bool _isLiveBackendConnected = false;
   bool get isLiveBackendConnected => _isLiveBackendConnected;
+  bool _isReconnecting = false;
+
+  /// True while the product catalog for the branch is loading for the first
+  /// time (not during silent background refreshes).
+  bool _isCatalogLoading = true;
+  bool get isCatalogLoading => _isCatalogLoading;
+
+  /// A one-time message for the UI, e.g. after an expired session forced a
+  /// sign-out. Call [clearSessionNotice] once it has been shown.
+  String? _sessionNotice;
+  String? get sessionNotice => _sessionNotice;
+  void clearSessionNotice() {
+    if (_sessionNotice == null) return;
+    _sessionNotice = null;
+    notifyListeners();
+  }
 
   StoreBranding _branding = const StoreBranding(
     name: StorefrontApi.defaultStoreSlug,
@@ -312,6 +365,8 @@ class AppState extends ChangeNotifier {
   String profileGender = ""; // Legacy data; never displayed or submitted.
   String? profileImageUrl;
   String? _accountPassword;
+  @Deprecated('Passwords are never stored locally; use changePassword, which '
+      'verifies the current password on the server.')
   String? get accountPassword => _accountPassword;
 
   final List<Map<String, dynamic>> _myReviews = [];
@@ -382,10 +437,11 @@ class AppState extends ChangeNotifier {
       final title =
           promo['name']?.toString() ?? promo['title']?.toString() ?? '';
       final discountType = promo['discount_type']?.toString() ?? 'percentage';
-      final discountVal = (promo['discount_value'] as num?)?.toDouble() ?? 20.0;
+      final discountVal =
+          double.tryParse(promo['discount_value']?.toString() ?? '');
       final discountLabel = promo['discount_label']?.toString() ??
           promo['badge']?.toString() ??
-          (discountType == 'percentage'
+          (discountType == 'percentage' && discountVal != null
               ? '-${discountVal.toStringAsFixed(0)}% OFF'
               : 'SPECIAL OFFER');
 
@@ -412,29 +468,22 @@ class AppState extends ChangeNotifier {
 
       if (matched) {
         double discPrice = product.price;
-        final promoPriceStr = promo['price']?.toString();
+        final promoPrice = double.tryParse(promo['price']?.toString() ?? '');
+        final linkCount = rawItems.isNotEmpty ? rawItems.length : 1;
 
-        // If promotion has a single explicit price, use it
-        if (promoPriceStr != null && double.tryParse(promoPriceStr) != null) {
-          // Only use explicit promo price if this promo targets a single product
-          final linkCount = rawItems.isNotEmpty ? rawItems.length : 1;
-          if (linkCount == 1) {
-            discPrice = double.parse(promoPriceStr);
-          } else {
-            if (discountType == 'percentage') {
-              discPrice = product.price * (1 - discountVal / 100);
-            } else {
-              discPrice =
-                  (product.price - discountVal).clamp(0.0, double.infinity);
-            }
-          }
-        } else {
+        // A single explicit promo price only applies to single-product promos.
+        if (promoPrice != null && linkCount == 1) {
+          discPrice = promoPrice;
+        } else if (discountVal != null) {
           if (discountType == 'percentage') {
             discPrice = product.price * (1 - discountVal / 100);
           } else {
             discPrice =
                 (product.price - discountVal).clamp(0.0, double.infinity);
           }
+        } else {
+          // No discount data from the backend: never invent one.
+          continue;
         }
 
         return {
@@ -449,9 +498,41 @@ class AppState extends ChangeNotifier {
   final List<Map<String, dynamic>> _bundles = [];
   List<Map<String, dynamic>> get bundles => List.unmodifiable(_bundles);
 
-  final List<Map<String, dynamic>> _deliveryZones = [];
-  List<Map<String, dynamic>> get deliveryZones =>
-      List.unmodifiable(_deliveryZones);
+  final List<DeliveryZone> _deliveryZones = [];
+  List<DeliveryZone> get deliveryZones => List.unmodifiable(_deliveryZones);
+
+  String? _selectedDeliveryZoneId;
+
+  /// The zone sent with delivery orders. Defaults to the first zone for the
+  /// selected branch.
+  DeliveryZone? get selectedDeliveryZone {
+    if (_deliveryZones.isEmpty) return null;
+    for (final zone in _deliveryZones) {
+      if (zone.id == _selectedDeliveryZoneId) return zone;
+    }
+    final branchId = selectedBranchId;
+    for (final zone in _deliveryZones) {
+      if (zone.branchId == branchId) return zone;
+    }
+    for (final zone in _deliveryZones) {
+      if (zone.servesBranch(branchId)) return zone;
+    }
+    return _deliveryZones.first;
+  }
+
+  String? get selectedDeliveryZoneId => selectedDeliveryZone?.id;
+
+  void selectDeliveryZone(String id) {
+    if (!_deliveryZones.any((zone) => zone.id == id)) return;
+    if (_selectedDeliveryZoneId == id) return;
+    _selectedDeliveryZoneId = id;
+    _invalidateCartQuote();
+    notifyListeners();
+  }
+
+  /// False when the store has delivery disabled or no active zones, since the
+  /// backend rejects delivery orders without a zone.
+  bool get deliveryAvailable => deliveryEnabled && _deliveryZones.isNotEmpty;
 
   final List<Map<String, dynamic>> _reviews = [];
   List<Map<String, dynamic>> get reviews => List.unmodifiable(_reviews);
@@ -476,6 +557,17 @@ class AppState extends ChangeNotifier {
   List<CustomerAddress> get customerAddresses =>
       List.unmodifiable(_customerAddresses);
 
+  /// The saved address whose [CustomerAddress.displayLabel] (or id) is
+  /// [label], or null.
+  CustomerAddress? addressForLabel(String label) {
+    for (final address in _customerAddresses) {
+      if (address.displayLabel == label || address.id == label) {
+        return address;
+      }
+    }
+    return null;
+  }
+
   // Simulated Notifications
   final List<Map<String, dynamic>> _notifications = [];
   List<Map<String, dynamic>> get notifications =>
@@ -496,9 +588,222 @@ class AppState extends ChangeNotifier {
   List<Product> _products = [];
   List<Product> get products => _products;
 
+  // Home "All Products" feed, loaded page by page from the backend
+  static const int _homeProductsPerPage = 20;
+  final List<Product> _homeProducts = [];
+  List<Product> get homeProducts => _homeProducts;
+  int _homeProductsPage = 0;
+  int _homeProductsTotal = 0;
+  int get homeProductsTotal => _homeProductsTotal;
+  bool _homeProductsHasMore = true;
+  bool get homeProductsHasMore => _homeProductsHasMore;
+  bool _isLoadingHomeProducts = false;
+  bool get isLoadingHomeProducts => _isLoadingHomeProducts;
+  int _homeProductsRequestId = 0;
+
+  /// True after the last home-feed page failed to load. While set, scroll
+  /// triggered loads are throttled with a backoff; call [retryHomeProducts]
+  /// from a retry button.
+  bool _homeProductsLoadFailed = false;
+  bool get homeProductsLoadFailed => _homeProductsLoadFailed;
+  int _homeProductsFailures = 0;
+  DateTime? _homeProductsRetryAt;
+
+  Future<void> retryHomeProducts() {
+    _homeProductsRetryAt = null;
+    return loadHomeProducts(reset: _homeProducts.isEmpty);
+  }
+
+  Future<void> loadHomeProducts({bool reset = false}) async {
+    if (!productsEnabled) return;
+    if (!reset && (_isLoadingHomeProducts || !_homeProductsHasMore)) return;
+    final retryAt = _homeProductsRetryAt;
+    if (!reset && retryAt != null && DateTime.now().isBefore(retryAt)) {
+      return;
+    }
+
+    final requestId = ++_homeProductsRequestId;
+    final nextPage = reset ? 1 : _homeProductsPage + 1;
+    _isLoadingHomeProducts = true;
+    notifyListeners();
+
+    try {
+      final result = await api.listProductsPage(
+        page: nextPage,
+        perPage: _homeProductsPerPage,
+        branchId: selectedBranchId,
+        wholesaleToken: _isWholesaleMode ? _wholesaleToken : null,
+        excludePreorder: true,
+      );
+      // A newer reset (branch switch, refresh) superseded this request.
+      if (requestId != _homeProductsRequestId) return;
+
+      if (reset) _homeProducts.clear();
+      final seenIds = _homeProducts.map((product) => product.id).toSet();
+      _homeProducts.addAll(result.items.where(
+        (product) => !product.isPreorder && seenIds.add(product.id),
+      ));
+      _homeProductsPage = nextPage;
+      _homeProductsTotal = result.total;
+      _homeProductsHasMore = result.hasMore;
+      _homeProductsLoadFailed = false;
+      _homeProductsFailures = 0;
+      _homeProductsRetryAt = null;
+    } catch (e) {
+      if (requestId == _homeProductsRequestId) {
+        _homeProductsLoadFailed = true;
+        _homeProductsFailures++;
+        final delaySeconds = min(60, 1 << min(_homeProductsFailures, 6));
+        _homeProductsRetryAt =
+            DateTime.now().add(Duration(seconds: delaySeconds));
+      }
+      debugPrint("Failed to load home products page $nextPage: $e");
+    } finally {
+      if (requestId == _homeProductsRequestId) {
+        _isLoadingHomeProducts = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Replaces home-feed items with their refreshed versions without
+  /// resetting pagination, so a background refresh never jumps the feed back
+  /// to page 1.
+  void _refreshHomeProductsInPlace() {
+    if (_homeProducts.isEmpty) {
+      unawaited(loadHomeProducts(reset: true));
+      return;
+    }
+    final liveById = {for (final product in _products) product.id: product};
+    for (var i = _homeProducts.length - 1; i >= 0; i--) {
+      final live = liveById[_homeProducts[i].id];
+      if (live == null || live.isPreorder) {
+        _homeProducts.removeAt(i);
+      } else {
+        _homeProducts[i] = live;
+      }
+    }
+  }
+
   // Cart
   final List<CartItem> _cart = [];
   List<CartItem> get cart => _cart;
+  bool get cartHasPreorder => _cart.any((item) => item.isPreorder);
+  bool get cartHasItems => _cart.isNotEmpty;
+
+  static const _openPreorderMaxQuantity = 99;
+
+  /// The highest quantity [item] may reach in the bag: the pre-order limit
+  /// for pre-orders, otherwise the available stock.
+  int maxCartQuantityFor(CartItem item) {
+    if (item.isPreorder) {
+      return item.product.preorderMaxQuantity ?? _openPreorderMaxQuantity;
+    }
+    return item.stockQuantity < 0 ? 0 : item.stockQuantity;
+  }
+
+  // Server-side cart pricing
+  CartQuote? _cartQuote;
+  CartQuote? get cartQuote => _cartQuote;
+  bool _isQuotingCart = false;
+  bool get isQuotingCart => _isQuotingCart;
+  Timer? _cartQuoteDebounce;
+  int _cartQuoteRequestId = 0;
+  static const _cartQuoteDebounceDuration = Duration(milliseconds: 400);
+
+  String _fulfillmentType = 'delivery';
+
+  /// 'delivery' or 'pickup'; used to price the cart quote.
+  String get fulfillmentType => _fulfillmentType;
+  void setFulfillmentType(String type) {
+    final normalized =
+        type.toLowerCase().trim() == 'pickup' ? 'pickup' : 'delivery';
+    if (normalized == _fulfillmentType) return;
+    _fulfillmentType = normalized;
+    _invalidateCartQuote();
+    notifyListeners();
+  }
+
+  /// Drops the current quote and schedules a debounced refresh.
+  void _invalidateCartQuote() {
+    _cartQuote = null;
+    _cartQuoteDebounce?.cancel();
+    if (_cart.isEmpty) {
+      _cartQuoteRequestId++;
+      _isQuotingCart = false;
+      return;
+    }
+    _cartQuoteDebounce =
+        Timer(_cartQuoteDebounceDuration, () => refreshCartQuote());
+  }
+
+  /// Prices the bag on the server (promotions, bundles, tax, delivery fee).
+  Future<void> refreshCartQuote() async {
+    _cartQuoteDebounce?.cancel();
+    if (_cart.isEmpty || !_isLiveBackendConnected || !checkoutEnabled) {
+      if (_cartQuote != null || _isQuotingCart) {
+        _cartQuote = null;
+        _isQuotingCart = false;
+        notifyListeners();
+      }
+      return;
+    }
+
+    final requestId = ++_cartQuoteRequestId;
+    var orderType =
+        cartHasPreorder || !deliveryEnabled ? 'pickup' : _fulfillmentType;
+    int? zoneId;
+    if (orderType == 'delivery') {
+      zoneId = selectedDeliveryZone?.numericId;
+      // The backend refuses delivery quotes without a zone.
+      if (zoneId == null) orderType = 'pickup';
+    }
+    final session = _customerSession;
+    _isQuotingCart = true;
+    notifyListeners();
+
+    try {
+      final data = await api.quoteCart(
+        branchId: selectedBranchId,
+        items: List<CartItem>.from(_cart),
+        orderType: orderType,
+        deliveryZoneId: zoneId,
+        session: session,
+        wholesaleToken: _isWholesaleMode ? _wholesaleToken : null,
+      );
+      if (requestId != _cartQuoteRequestId) return;
+      _cartQuote = CartQuote.fromJson(data, orderType: orderType);
+    } catch (e) {
+      if (requestId != _cartQuoteRequestId) return;
+      _cartQuote = null;
+      if (session != null) {
+        await _handleSessionError(e, session);
+      }
+      debugPrint("Cart quote unavailable, showing local totals: $e");
+    } finally {
+      if (requestId == _cartQuoteRequestId) {
+        _isQuotingCart = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Idempotency key reused for retries of the same checkout request.
+  String? _checkoutIdempotencyKey;
+  String? _checkoutRequestSignature;
+
+  void _resetCheckoutAttempt() {
+    _checkoutIdempotencyKey = null;
+    _checkoutRequestSignature = null;
+  }
+
+  /// Persists the cart, ends the current checkout attempt and reprices.
+  void _onCartChanged({bool notify = true}) {
+    _saveCart();
+    _resetCheckoutAttempt();
+    _invalidateCartQuote();
+    if (notify) notifyListeners();
+  }
 
   // Wishlist
   final List<Product> _wishlist = [];
@@ -517,9 +822,36 @@ class AppState extends ChangeNotifier {
   List<SupportTicket> get tickets => _tickets;
 
   void setBranch(String branch) {
+    if (branch == _selectedBranch) return;
     _selectedBranch = branch;
+    _selectedDeliveryZoneId = null;
+    _homeProductsRetryAt = null;
+    _resetCheckoutAttempt();
+    _invalidateCartQuote();
     notifyListeners();
+    unawaited(_persistSelectedBranch());
+    // Reloads products for the branch, which also re-checks the cart.
     _loadCustomerModulesForSelectedBranch();
+  }
+
+  Future<void> _persistSelectedBranch() async {
+    if (_branchRecords.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+          _storeScopedKey('selected_branch_id'), selectedBranchId);
+    } catch (e) {
+      debugPrint('Failed to save selected branch: $e');
+    }
+  }
+
+  Future<int?> _readSavedBranchId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(_storeScopedKey('selected_branch_id'));
+    } catch (_) {
+      return null;
+    }
   }
 
   int get selectedBranchId {
@@ -607,26 +939,46 @@ class AppState extends ChangeNotifier {
   }
 
   bool canAddToCart(Product product,
+          [int quantity = 1, ProductVariant? variant]) =>
+      cartAddBlockReason(product, quantity, variant) == null;
+
+  /// Why [product] can't be added to the bag, or null when it can.
+  String? cartAddBlockReason(Product product,
       [int quantity = 1, ProductVariant? variant]) {
     if (product.variants.isNotEmpty && variant == null) {
-      return false;
+      return 'Select options before adding.';
     }
-    final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
     if (quantity <= 0) {
-      return false;
+      return 'Choose a quantity of at least 1.';
     }
     if (_cart.isNotEmpty &&
         _cart.any((item) => item.isPreorder != product.isPreorder)) {
-      return false;
+      return product.isPreorder
+          ? 'Your bag has regular items. Pre-orders are checked out on their own, so check out or remove those items first.'
+          : 'Your bag has a pre-order item. Pre-orders are checked out on their own, so check out or remove it before adding regular items.';
     }
+
+    final inBag = cartQuantityFor(product, variant: variant);
     if (product.isPreorder) {
       final maxQuantity = product.preorderMaxQuantity;
-      return maxQuantity == null ||
-          cartQuantityFor(product, variant: variant) + quantity <= maxQuantity;
+      if (maxQuantity != null && inBag + quantity > maxQuantity) {
+        return inBag > 0
+            ? 'Maximum $maxQuantity per pre-order. You already have $inBag in your bag.'
+            : 'Maximum $maxQuantity per pre-order.';
+      }
+      return null;
     }
-    if (stockQuantity <= 0) return false;
-    return cartQuantityFor(product, variant: variant) + quantity <=
-        stockQuantity;
+
+    final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
+    if (stockQuantity <= 0) {
+      return 'This item is out of stock.';
+    }
+    if (inBag + quantity > stockQuantity) {
+      return inBag > 0
+          ? 'Only $stockQuantity in stock. You already have $inBag in your bag.'
+          : 'Only $stockQuantity in stock.';
+    }
+    return null;
   }
 
   bool addToCart(Product product, {int quantity = 1, ProductVariant? variant}) {
@@ -645,8 +997,7 @@ class AppState extends ChangeNotifier {
       _cart.add(
           CartItem(product: product, variant: variant, quantity: quantity));
     }
-    _saveCart();
-    notifyListeners();
+    _onCartChanged();
     return true;
   }
 
@@ -657,14 +1008,12 @@ class AppState extends ChangeNotifier {
           Product.compareIds(item.product.id, product.id) &&
           Product.compareIds(item.variantId, variantId),
     );
-    _saveCart();
-    notifyListeners();
+    _onCartChanged();
   }
 
   void removeCartItem(CartItem cartItem) {
     _cart.removeWhere((item) => item.cartKey == cartItem.cartKey);
-    _saveCart();
-    notifyListeners();
+    _onCartChanged();
   }
 
   bool updateQuantity(Product product, int quantity,
@@ -675,41 +1024,130 @@ class AppState extends ChangeNotifier {
           Product.compareIds(item.product.id, product.id) &&
           Product.compareIds(item.variantId, variantId),
     );
-    final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
     if (index >= 0) {
       if (quantity <= 0) {
         _cart.removeAt(index);
-      } else if (!product.isPreorder && quantity > stockQuantity) {
-        return false;
-      } else if (product.isPreorder &&
-          product.preorderMaxQuantity != null &&
-          quantity > product.preorderMaxQuantity!) {
+      } else if (quantity > maxCartQuantityFor(_cart[index])) {
         return false;
       } else {
         _cart[index].quantity = quantity;
       }
-      _saveCart();
-      notifyListeners();
+      _onCartChanged();
       return true;
     } else if (quantity > 0) {
-      if (product.variants.isNotEmpty && variant == null) {
-        return false;
-      }
-      if (!product.isPreorder && quantity > stockQuantity) {
-        return false;
-      }
-      if (product.isPreorder &&
-          product.preorderMaxQuantity != null &&
-          quantity > product.preorderMaxQuantity!) {
+      // A new line goes through the same checks as addToCart, including the
+      // rule that keeps pre-orders and regular items in separate orders.
+      if (cartAddBlockReason(product, quantity, variant) != null) {
         return false;
       }
       _cart.add(
           CartItem(product: product, variant: variant, quantity: quantity));
-      _saveCart();
-      notifyListeners();
+      _onCartChanged();
       return true;
     }
     return true;
+  }
+
+  /// Adds a bundle's real component products (and variants) as normal cart
+  /// lines in their required quantities. The backend applies the bundle
+  /// price automatically at quote and checkout.
+  Future<void> addBundleToCart(Map<String, dynamic> bundle,
+      {int sets = 1}) async {
+    if (sets <= 0) {
+      throw const StorefrontApiException('Choose at least one set.');
+    }
+    final rawItems =
+        bundle['items'] ?? bundle['bundle_items'] ?? bundle['products'];
+    final components =
+        rawItems is List ? rawItems.whereType<Map>().toList() : <Map>[];
+    if (components.isEmpty) {
+      throw const StorefrontApiException('This bundle has no products to add.');
+    }
+
+    final lines = <String, CartItem>{};
+    for (final component in components) {
+      final productId =
+          (component['product_id'] ?? component['id'])?.toString().trim() ?? '';
+      final variantId = component['variant_id']?.toString().trim() ?? '';
+      final componentName =
+          (component['product_name'] ?? component['name'] ?? '')
+              .toString()
+              .trim();
+      final unavailable = StorefrontApiException(componentName.isEmpty
+          ? 'Part of this bundle is no longer available.'
+          : '$componentName is no longer available.');
+      final perSet =
+          double.tryParse(component['quantity']?.toString() ?? '')?.toInt() ??
+              1;
+      final quantity = (perSet <= 0 ? 1 : perSet) * sets;
+      if (productId.isEmpty) throw unavailable;
+
+      Product? product;
+      for (final candidate in _products) {
+        if (Product.compareIds(candidate.id, productId)) {
+          product = candidate;
+          break;
+        }
+      }
+      if ((product == null || !product.hasVariantData) && !_isWholesaleMode) {
+        try {
+          product =
+              await api.getProduct(productId, branchId: selectedBranchId) ??
+                  product;
+        } catch (e) {
+          debugPrint('Bundle component $productId lookup failed: $e');
+        }
+      }
+      if (product == null) throw unavailable;
+
+      ProductVariant? variant;
+      if (variantId.isNotEmpty) {
+        for (final candidate in product.variants) {
+          if (Product.compareIds(candidate.id, variantId)) {
+            variant = candidate;
+            break;
+          }
+        }
+        if (variant == null) throw unavailable;
+      } else if (product.variants.isNotEmpty) {
+        final inStock = product.variants
+            .where((candidate) => candidate.stockQuantity >= quantity)
+            .toList();
+        if (inStock.isEmpty && !product.isPreorder) {
+          throw StorefrontApiException(
+              '${product.name} is out of stock in the bundle quantity.');
+        }
+        final pool = inStock.isEmpty ? product.variants : inStock;
+        variant = pool.firstWhere((candidate) => candidate.isDefault,
+            orElse: () => pool.first);
+      }
+
+      final line = CartItem(product: product, variant: variant);
+      final existing = lines[line.cartKey];
+      lines[line.cartKey] = CartItem(
+        product: product,
+        variant: variant,
+        quantity: (existing?.quantity ?? 0) + quantity,
+      );
+    }
+
+    for (final line in lines.values) {
+      final reason =
+          cartAddBlockReason(line.product, line.quantity, line.variant);
+      if (reason != null) {
+        throw StorefrontApiException('${line.displayName}: $reason');
+      }
+    }
+
+    for (final line in lines.values) {
+      final index = _cart.indexWhere((item) => item.cartKey == line.cartKey);
+      if (index >= 0) {
+        _cart[index].quantity += line.quantity;
+      } else {
+        _cart.add(line);
+      }
+    }
+    _onCartChanged();
   }
 
   bool updateCartItemQuantity(CartItem cartItem, int quantity) {
@@ -717,10 +1155,10 @@ class AppState extends ChangeNotifier {
         variant: cartItem.variant);
   }
 
+  /// Empties the bag in memory and in storage.
   void clearCart() {
     _cart.clear();
-    _saveCart();
-    notifyListeners();
+    _onCartChanged();
   }
 
   // ── Cart Persistence ──────────────────────────────────────────────────
@@ -805,94 +1243,180 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  double get cartSubtotal =>
+  double get _localCartSubtotal =>
       _cart.fold(0.0, (sum, item) => sum + item.totalPrice);
-  double get cartDeliveryFee => deliveryEnabled ? _deliveryCharge : 0.0;
-  double get cartDiscount => 0.0;
-  double get cartTotal => cartSubtotal + cartDeliveryFee - cartDiscount;
+
+  /// Server-quoted values when a quote is present, local math otherwise.
+  double get cartSubtotal => _cartQuote?.subtotal ?? _localCartSubtotal;
+  double get cartDiscount => _cartQuote?.discount ?? 0.0;
+  double get cartTax => _cartQuote?.tax ?? 0.0;
+  List<String> get cartAppliedLabels => _cartQuote?.appliedLabels ?? const [];
+  double get cartDeliveryFee {
+    if (!deliveryEnabled || cartHasPreorder) return 0.0;
+    final quote = _cartQuote;
+    if (quote != null && quote.orderType == 'delivery') {
+      return quote.deliveryFee;
+    }
+    return _deliveryCharge;
+  }
+
+  double get cartTotal => cartTotalFor(_fulfillmentType);
   double cartDeliveryFeeFor(String deliveryType) =>
       deliveryType.toLowerCase() == "delivery" ? cartDeliveryFee : 0.0;
-  double cartTotalFor(String deliveryType) =>
-      cartSubtotal + cartDeliveryFeeFor(deliveryType) - cartDiscount;
+  double cartTotalFor(String deliveryType) {
+    final quote = _cartQuote;
+    if (quote == null) {
+      return _localCartSubtotal + cartDeliveryFeeFor(deliveryType);
+    }
+    return quote.total - quote.deliveryFee + cartDeliveryFeeFor(deliveryType);
+  }
 
-  Future<AppOrder?> checkout(String deliveryType, String address,
-      {String? pickupTime}) async {
-    if (_cart.isEmpty) return null;
+  static String _newIdempotencyKey(String storeSlug) {
+    final random = Random.secure().nextInt(0x7fffffff).toRadixString(36);
+    return '$storeSlug-${DateTime.now().microsecondsSinceEpoch}-$random';
+  }
+
+  /// Places the order. Always returns the order or throws.
+  ///
+  /// [address] is the selected saved address label for delivery orders.
+  /// [notes] is the customer's own note for the store.
+  Future<AppOrder> checkout(String deliveryType, String address,
+      {String? pickupTime, String? notes}) async {
+    if (_cart.isEmpty) {
+      throw StateError('Your bag is empty.');
+    }
+    if (_isCheckingOut) {
+      throw const StorefrontApiException('Your order is already being placed.');
+    }
     if (!checkoutEnabled) {
-      throw Exception('Checkout is unavailable for this store');
+      throw const StorefrontApiException(
+          'Checkout is unavailable for this store.');
     }
-    if (deliveryType.toLowerCase() == 'delivery' && !deliveryEnabled) {
-      throw Exception('Delivery is unavailable for this store');
+    if (cartHasPreorder) {
+      // Pre-orders are collected in store once the items arrive.
+      deliveryType = 'Pickup';
+      pickupTime = null;
     }
+    final isDelivery = deliveryType.toLowerCase() == 'delivery';
+    final orderType = isDelivery ? 'delivery' : 'pickup';
+
+    CustomerAddress? deliveryAddress;
+    int? deliveryAddressId;
+    int? deliveryZoneId;
+    if (isDelivery) {
+      if (!deliveryEnabled) {
+        throw const StorefrontApiException(
+            'Delivery is unavailable for this store.');
+      }
+      deliveryAddress = addressForLabel(address);
+      deliveryAddressId = int.tryParse(deliveryAddress?.id ?? '');
+      if (deliveryAddressId == null) {
+        throw const StorefrontApiException(
+            'Choose a saved delivery address before placing your order.');
+      }
+      deliveryZoneId = selectedDeliveryZone?.numericId;
+      if (deliveryZoneId == null) {
+        throw const StorefrontApiException(
+            'Delivery is not available for this branch. Choose pickup instead.');
+      }
+    }
+    final trimmedNotes = notes?.trim() ?? '';
+    final session = _customerSession;
+    final cartSnapshot = List<CartItem>.from(_cart);
+    final branchId = selectedBranchId;
+    final branchName = _selectedBranch;
+    final wholesaleToken = _isWholesaleMode ? _wholesaleToken : null;
+
+    // Same request → same key, so a retry after a timeout can't create a
+    // second order. Any change to the request starts a new attempt.
+    final signature = jsonEncode({
+      'branch': branchId,
+      'type': orderType,
+      'address': deliveryAddressId,
+      'zone': deliveryZoneId,
+      'notes': trimmedNotes,
+      'pickup': pickupTime,
+      'wholesale': wholesaleToken != null,
+      'customer': session?.customerId,
+      'items': cartSnapshot
+          .map((item) => [item.product.id, item.variantId, item.quantity])
+          .toList(),
+    });
+    if (_checkoutIdempotencyKey == null ||
+        _checkoutRequestSignature != signature) {
+      _checkoutIdempotencyKey = _newIdempotencyKey(api.storeSlug);
+      _checkoutRequestSignature = signature;
+    }
+    final idempotencyKey = _checkoutIdempotencyKey!;
 
     _isCheckingOut = true;
     notifyListeners();
 
-    final cartSnapshot = List<CartItem>.from(_cart);
-
     try {
       final Map<String, dynamic> result;
-      if (_isWholesaleMode && _wholesaleToken != null) {
+      if (wholesaleToken != null) {
         result = await api.checkoutWholesale(
-          wholesaleToken: _wholesaleToken!,
-          branchId: selectedBranchId,
+          wholesaleToken: wholesaleToken,
+          branchId: branchId,
           items: cartSnapshot,
-          orderType:
-              deliveryType.toLowerCase() == "delivery" ? "delivery" : "pickup",
-          customerId: _customerSession?.customerId,
-          customerToken: _customerSession?.customerToken,
-          deliveryAddressId: deliveryType.toLowerCase() == "delivery"
-              ? _addressIdForLabel(address)
-              : null,
-          deliveryZoneId: deliveryType.toLowerCase() == "delivery" &&
-                  _deliveryZones.isNotEmpty
-              ? (_deliveryZones.first['id'] as num?)?.toInt()
-              : null,
-          notes: address,
+          orderType: orderType,
+          customerId: session?.customerId,
+          customerToken: session?.customerToken,
+          deliveryAddressId: deliveryAddressId,
+          deliveryZoneId: deliveryZoneId,
+          notes: trimmedNotes,
           pickupTime: pickupTime,
+          idempotencyKey: idempotencyKey,
         );
       } else {
         result = await api.checkout(
-          branchId: selectedBranchId,
+          branchId: branchId,
           items: cartSnapshot,
-          orderType:
-              deliveryType.toLowerCase() == "delivery" ? "delivery" : "pickup",
-          customerId: _customerSession?.customerId,
-          customerToken: _customerSession?.customerToken,
-          deliveryAddressId: deliveryType.toLowerCase() == "delivery"
-              ? _addressIdForLabel(address)
-              : null,
-          deliveryZoneId: deliveryType.toLowerCase() == "delivery" &&
-                  _deliveryZones.isNotEmpty
-              ? (_deliveryZones.first['id'] as num?)?.toInt()
-              : null,
-          notes: address,
+          orderType: orderType,
+          customerId: session?.customerId,
+          customerToken: session?.customerToken,
+          deliveryAddressId: deliveryAddressId,
+          deliveryZoneId: deliveryZoneId,
+          notes: trimmedNotes,
           pickupTime: pickupTime,
+          idempotencyKey: idempotencyKey,
         );
       }
       final pricing = result['pricing'] as Map<String, dynamic>?;
+      final resultBranch = result['branch_name']?.toString() ?? '';
+      final orderBranch = resultBranch.isNotEmpty ? resultBranch : branchName;
       final liveOrder = AppOrder(
         id: result['order_number']?.toString() ??
             result['order_id']?.toString() ??
-            'SC-${DateTime.now().millisecondsSinceEpoch}',
+            idempotencyKey,
         items: cartSnapshot,
         subtotal: _number(pricing?['subtotal'], cartSubtotal),
-        deliveryFee: _number(pricing?['delivery_fee'], cartDeliveryFee),
+        deliveryFee:
+            _number(pricing?['delivery_fee'], cartDeliveryFeeFor(deliveryType)),
         discount: _number(pricing?['discount_amount'], cartDiscount),
-        total: _number(pricing?['total'], cartTotal),
-        deliveryType: deliveryType,
+        total: _number(pricing?['total'], cartTotalFor(deliveryType)),
+        deliveryType: isDelivery ? 'Delivery' : 'Pickup',
         status: "Pending",
         createdAt: DateTime.now(),
-        address: address,
+        address: isDelivery
+            ? (deliveryAddress?.formattedAddress.isNotEmpty == true
+                ? deliveryAddress!.formattedAddress
+                : address)
+            : orderBranch,
         fulfillmentMode: result['fulfillment_mode']?.toString() ?? 'standard',
         preorderEtaText: result['preorder_eta_text']?.toString() ?? '',
+        branchName: orderBranch,
+        notes: trimmedNotes,
       );
       _orders.insert(0, liveOrder);
-      _cart.clear();
-      notifyListeners();
+      // Persist the empty bag so the ordered items never come back.
+      clearCart();
       return liveOrder;
     } catch (e) {
       debugPrint("Storefront checkout failed: $e");
+      if (session != null) {
+        await _handleSessionError(e, session);
+      }
       rethrow;
     } finally {
       _isCheckingOut = false;
@@ -932,6 +1456,7 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
+      await _handleSessionError(e, session);
       debugPrint("Failed to load support tickets: $e");
     }
   }
@@ -953,13 +1478,24 @@ class AppState extends ChangeNotifier {
         mappedCategory = category.toLowerCase();
       }
 
-      final ticketData = await api.createSupportTicket(
-        subject: title,
-        category: mappedCategory,
-        message: description,
-        attachments: attachments,
-        session: _customerSession,
-      );
+      final session = _customerSession;
+      final ticketData = session == null
+          ? await api.createSupportTicket(
+              subject: title,
+              category: mappedCategory,
+              message: description,
+              attachments: attachments,
+            )
+          : await _guardSession(
+              session,
+              () => api.createSupportTicket(
+                subject: title,
+                category: mappedCategory,
+                message: description,
+                attachments: attachments,
+                session: session,
+              ),
+            );
       if (_customerSession != null) {
         await loadCustomerData();
       } else {
@@ -1008,6 +1544,7 @@ class AppState extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
+      await _handleSessionError(e, session);
       debugPrint("Failed to refresh ticket details: $e");
     }
   }
@@ -1025,11 +1562,14 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      await api.replySupportTicket(
-        ticketId: ticketId,
-        message: content,
-        attachments: attachments,
-        session: session,
+      await _guardSession(
+        session,
+        () => api.replySupportTicket(
+          ticketId: ticketId,
+          message: content,
+          attachments: attachments,
+          session: session,
+        ),
       );
       await refreshTicketDetails(ticketId);
     } catch (e) {
@@ -1038,8 +1578,12 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> uploadSupportAttachment(
-      String filePath, String filename) async {
+  static const _maxSupportAttachmentBytes = 10 * 1024 * 1024;
+
+  /// Uploads a picked file (web-safe: reads bytes, no dart:io) and returns
+  /// the attachment payload to send with a ticket message.
+  Future<Map<String, dynamic>> uploadSupportAttachment(XFile file,
+      [String? filename]) async {
     if (!supportEnabled) {
       throw const StorefrontApiException(
           "Customer support is unavailable for this store.");
@@ -1049,11 +1593,32 @@ class AppState extends ChangeNotifier {
       throw const StorefrontApiException(
           "Must be signed in to upload support attachments.");
     }
-    return api.uploadSupportAttachment(
-      filePath: filePath,
-      filename: filename,
-      session: session,
+    final name = (filename?.trim().isNotEmpty == true)
+        ? filename!.trim()
+        : _fileNameOf(file);
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      throw const StorefrontApiException('That file is empty.');
+    }
+    if (bytes.length > _maxSupportAttachmentBytes) {
+      throw const StorefrontApiException('Choose a file smaller than 10 MB.');
+    }
+    return _guardSession(
+      session,
+      () => api.uploadSupportAttachment(
+        bytes: bytes,
+        filename: name,
+        mimeType: file.mimeType,
+        session: session,
+      ),
     );
+  }
+
+  static String _fileNameOf(XFile file) {
+    if (file.name.trim().isNotEmpty) return file.name.trim();
+    final segments = file.path.split(RegExp(r'[\\/]'));
+    final last = segments.isEmpty ? '' : segments.last;
+    return last.isEmpty ? 'upload.jpg' : last;
   }
 
   Future<void> closeTicket(String ticketId) async {
@@ -1127,16 +1692,54 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
 
-    if (_customerSession != null && !id.startsWith('mock-')) {
+    final session = _customerSession;
+    if (session != null &&
+        !id.startsWith('mock-') &&
+        !id.startsWith('local-')) {
       try {
         await api.markNotificationRead(
           notificationId: id,
-          session: _customerSession!,
+          session: session,
         );
       } catch (e) {
+        await _handleSessionError(e, session);
         debugPrint("Storefront notification read kept local: $e");
       }
     }
+  }
+
+  /// Marks every notification read with one request. Throws on failure.
+  Future<void> markAllNotificationsRead() async {
+    if (!notificationsEnabled) return;
+    final session = _customerSession;
+    if (session != null) {
+      try {
+        await _guardSession(
+            session, () => api.markAllNotificationsRead(session));
+      } on StorefrontApiException catch (e) {
+        if (e.statusCode != 404) rethrow;
+        // Older backend without read-all: mark the unread ones one by one.
+        final unread = _notifications
+            .where((n) => n['isRead'] != true)
+            .map((n) => n['id']?.toString() ?? '')
+            .where((id) =>
+                id.isNotEmpty &&
+                !id.startsWith('mock-') &&
+                !id.startsWith('local-'))
+            .toList();
+        for (final id in unread) {
+          await _guardSession(
+            session,
+            () =>
+                api.markNotificationRead(notificationId: id, session: session),
+          );
+        }
+      }
+    }
+    for (final notification in _notifications) {
+      notification['isRead'] = true;
+    }
+    notifyListeners();
   }
 
   void addLocalNotification({
@@ -1197,9 +1800,11 @@ class AppState extends ChangeNotifier {
       {Map<String, dynamic>? initialConfig}) async {
     _isLoadingConfig = true;
     notifyListeners();
+    final previousBranchId = _branchRecords.isEmpty ? null : selectedBranchId;
 
     try {
       final config = initialConfig ?? await api.getConfig();
+      final savedBranchId = await _readSavedBranchId();
       _branding = StoreBranding.fromConfig(config, fallbackSlug: api.storeSlug);
       await cacheBranding(api.storeSlug, _branding);
       _featureFlags
@@ -1232,7 +1837,43 @@ class AppState extends ChangeNotifier {
         _branches
           ..clear()
           ..addAll(liveBranches.map((branch) => branch.name));
-        _selectedBranch = _branches.first;
+
+        // Keep the customer's branch across refreshes and restarts.
+        StorefrontBranch? keptBranch;
+        for (final id in [previousBranchId, savedBranchId]) {
+          if (id == null) continue;
+          for (final branch in liveBranches) {
+            if (branch.id == id) {
+              keptBranch = branch;
+              break;
+            }
+          }
+          if (keptBranch != null) break;
+        }
+        _selectedBranch = keptBranch?.name ?? _branches.first;
+
+        if (keptBranch == null && productsEnabled && liveBranches.length > 1) {
+          for (final branch in liveBranches) {
+            try {
+              final summary = await api.getCatalogSummary(branchId: branch.id);
+              final productCount = int.tryParse(
+                    summary['product_count']?.toString() ?? '',
+                  ) ??
+                  0;
+              if (productCount > 0) {
+                _selectedBranch = branch.name;
+                break;
+              }
+            } catch (_) {
+              // Keep the configured first branch if the catalog summary is
+              // unavailable; the normal storefront load reports its own errors.
+              break;
+            }
+          }
+        }
+      }
+      if (liveBranches.isNotEmpty) {
+        unawaited(_persistSelectedBranch());
       }
       await _loadCustomerModulesForSelectedBranch(notify: false);
       _isLiveBackendConnected = true;
@@ -1244,14 +1885,45 @@ class AppState extends ChangeNotifier {
       debugPrint("Storefront backend config unavailable: $e");
     } finally {
       _isLoadingConfig = false;
+      _isCatalogLoading = false;
       notifyListeners();
+    }
+    if (_isLiveBackendConnected) {
+      _invalidateCartQuote();
     }
   }
 
+  /// Retries the backend after an offline start or a lost connection.
+  Future<void> _reconnect() async {
+    if (_isLoadingConfig || _isReconnecting) return;
+    _isReconnecting = true;
+    try {
+      await _fetchBackendConfig();
+      if (_isLiveBackendConnected && _customerSession != null) {
+        await loadCustomerData();
+      }
+    } finally {
+      _isReconnecting = false;
+    }
+  }
+
+  void _onPeriodicRefresh() {
+    if (!_isLiveBackendConnected) {
+      unawaited(_reconnect());
+      return;
+    }
+    unawaited(_refreshCatalogFromBackend());
+  }
+
   void _applyFeatureVisibilityRules() {
+    var cartCleared = false;
     if (!productsEnabled) {
       _products.clear();
-      _cart.clear();
+      _homeProducts.clear();
+      if (_cart.isNotEmpty) {
+        _cart.clear();
+        cartCleared = true;
+      }
     }
     if (!categoriesEnabled) {
       _categories.clear();
@@ -1290,7 +1962,13 @@ class AppState extends ChangeNotifier {
     if (!ordersEnabled) {
       _orders.clear();
       _orderTimelines.clear();
-      _cart.clear();
+      if (_cart.isNotEmpty) {
+        _cart.clear();
+        cartCleared = true;
+      }
+    }
+    if (cartCleared) {
+      _onCartChanged(notify: false);
     }
     if (!wholesaleEnabled) {
       _isWholesaleMode = false;
@@ -1314,7 +1992,9 @@ class AppState extends ChangeNotifier {
       _wholesaleMinOrderAmount =
           (data['minimum_order_amount'] as num?)?.toDouble() ?? 0.0;
       _isWholesaleMode = true;
-      _cart.clear(); // Clear cart as retail prices no longer apply
+      // Retail prices no longer apply; persist the empty bag too.
+      _cart.clear();
+      _onCartChanged(notify: false);
       await _loadProductsForSelectedBranch(notify: false);
       notifyListeners();
     } catch (e) {
@@ -1327,14 +2007,26 @@ class AppState extends ChangeNotifier {
     _isWholesaleMode = false;
     _wholesaleToken = null;
     _wholesaleMinOrderAmount = 0.0;
-    _cart.clear(); // Clear cart as wholesale prices no longer apply
+    // Wholesale prices no longer apply; persist the empty bag too.
+    _cart.clear();
+    _onCartChanged(notify: false);
     _loadProductsForSelectedBranch(notify: false);
     notifyListeners();
   }
 
-  Future<void> _loadProductsForSelectedBranch({bool notify = true}) async {
+  int _productsRequestId = 0;
+
+  /// Loads the catalog for the selected branch. [background] refreshes keep
+  /// the home feed's pagination and don't flip [isCatalogLoading]. Results
+  /// from a superseded request (e.g. an older branch) are ignored.
+  Future<void> _loadProductsForSelectedBranch({
+    bool notify = true,
+    bool preserveOnError = false,
+    bool background = false,
+  }) async {
     if (!productsEnabled) {
       _products.clear();
+      _isCatalogLoading = false;
       if (notify) {
         notifyListeners();
       }
@@ -1343,31 +2035,90 @@ class AppState extends ChangeNotifier {
 
     if (!_isLiveBackendConnected && notify) {
       _products.clear();
+      _isCatalogLoading = false;
       notifyListeners();
       return;
     }
 
+    final requestId = ++_productsRequestId;
+    final branchId = selectedBranchId;
+    final wholesaleToken = _isWholesaleMode ? _wholesaleToken : null;
+    if (!background) {
+      _isCatalogLoading = true;
+      if (notify) notifyListeners();
+    }
+
     try {
       final List<Product> liveProducts;
-      if (_isWholesaleMode && _wholesaleToken != null) {
+      if (wholesaleToken != null) {
         liveProducts = await api.listWholesaleProducts(
-          wholesaleToken: _wholesaleToken!,
-          branchId: selectedBranchId,
+          wholesaleToken: wholesaleToken,
+          branchId: branchId,
         );
       } else {
-        liveProducts = await api.listProducts(branchId: selectedBranchId);
+        liveProducts = await api.listProducts(branchId: branchId);
       }
-      _products = liveProducts;
+      if (requestId != _productsRequestId) return;
+      _products = List<Product>.from(liveProducts);
       _reconcileCartWithProducts();
-      if (notify) {
-        notifyListeners();
+      if (background) {
+        _refreshHomeProductsInPlace();
+      } else {
+        unawaited(loadHomeProducts(reset: true));
       }
     } catch (e) {
-      _products.clear();
-      if (notify) {
-        notifyListeners();
+      if (requestId != _productsRequestId) return;
+      if (!preserveOnError) {
+        _products.clear();
       }
-      debugPrint("Storefront catalog cleared after failed live load: $e");
+      debugPrint("Storefront catalog load failed: $e");
+    } finally {
+      if (requestId == _productsRequestId) {
+        if (!background) _isCatalogLoading = false;
+        if (notify) {
+          notifyListeners();
+        }
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (!_isLiveBackendConnected) {
+        unawaited(_reconnect());
+      } else {
+        _refreshCatalogFromBackend(force: true);
+      }
+    }
+  }
+
+  Future<void> _refreshCatalogFromBackend({bool force = false}) async {
+    if (!_isLiveBackendConnected ||
+        !productsEnabled ||
+        _isAutomaticCatalogRefreshRunning) {
+      return;
+    }
+
+    final now = DateTime.now();
+    if (!force &&
+        _lastAutomaticCatalogRefresh != null &&
+        now.difference(_lastAutomaticCatalogRefresh!) <
+            _catalogRefreshInterval) {
+      return;
+    }
+
+    _lastAutomaticCatalogRefresh = now;
+    _isAutomaticCatalogRefreshRunning = true;
+    try {
+      await _loadProductsForSelectedBranch(
+        notify: false,
+        preserveOnError: true,
+        background: true,
+      );
+      notifyListeners();
+    } finally {
+      _isAutomaticCatalogRefreshRunning = false;
     }
   }
 
@@ -1390,6 +2141,12 @@ class AppState extends ChangeNotifier {
       }
 
       ProductVariant? liveVariant;
+      if (item.variantId.isNotEmpty && !liveProduct.hasVariantData) {
+        // The list payload has no variants, so the variant can't be checked
+        // here. Keep the line as it is; quote and checkout validate it.
+        reconciled.add(item);
+        continue;
+      }
       if (item.variantId.isNotEmpty) {
         for (final variant in liveProduct.variants) {
           if (Product.compareIds(variant.id, item.variantId)) {
@@ -1434,7 +2191,7 @@ class AppState extends ChangeNotifier {
       _cart
         ..clear()
         ..addAll(reconciled);
-      _saveCart();
+      _onCartChanged(notify: false);
     }
   }
 
@@ -1451,6 +2208,9 @@ class AppState extends ChangeNotifier {
       if (reviewsEnabled) _loadReviews(),
       if (reviewsEnabled) _loadStoreReviews(),
     ]);
+    if (_isLiveBackendConnected) {
+      _invalidateCartQuote();
+    }
 
     if (notify) {
       notifyListeners();
@@ -1562,11 +2322,21 @@ class AppState extends ChangeNotifier {
       _deliveryZones.clear();
       return;
     }
+    final branchId = selectedBranchId;
     try {
+      final rows = await api.listDeliveryZones(branchId: branchId);
+      // A newer branch switch owns the zone list.
+      if (branchId != selectedBranchId) return;
       _deliveryZones
         ..clear()
-        ..addAll(await api.listDeliveryZones(branchId: selectedBranchId));
+        ..addAll(rows
+            .map(DeliveryZone.fromJson)
+            .where((zone) => zone.numericId != null));
+      if (!_deliveryZones.any((zone) => zone.id == _selectedDeliveryZoneId)) {
+        _selectedDeliveryZoneId = null;
+      }
     } catch (e) {
+      if (branchId != selectedBranchId) return;
       _deliveryZones.clear();
       debugPrint(
           "Storefront delivery zones cleared after failed live load: $e");
@@ -1619,6 +2389,7 @@ class AppState extends ChangeNotifier {
         ..addAll(data);
       notifyListeners();
     } catch (e) {
+      await _handleSessionError(e, session);
       debugPrint("Failed to load my reviews: $e");
     }
   }
@@ -1686,12 +2457,22 @@ class AppState extends ChangeNotifier {
         checkExists: checkExists, checkNotExists: checkNotExists);
   }
 
-  Future<void> requestPasswordReset(String identifier) async {
+  /// Sends a reset request for [username] (or an email) and returns the
+  /// server message to show.
+  Future<String> requestPasswordReset(String username) async {
     if (!_isLiveBackendConnected) {
       throw const StorefrontApiException(
           "Password reset requests are unavailable while the store backend is offline.");
     }
-    await api.requestPasswordReset(identifier);
+    final value = username.trim();
+    if (value.isEmpty) {
+      throw const StorefrontApiException('Enter your username.');
+    }
+    final data = await api.requestPasswordReset(value);
+    final message = data['message']?.toString().trim() ?? '';
+    return message.isNotEmpty
+        ? message
+        : 'Your reset request was sent. The store will contact you.';
   }
 
   Future<void> verifyCustomerOtp({
@@ -1715,14 +2496,13 @@ class AppState extends ChangeNotifier {
           "Customer authentication did not return a valid session.");
     }
     _customerSession = session;
+    _sessionNotice = null;
     profileEmail = identifier.contains("@") ? identifier : profileEmail;
     if (fullName != null && fullName.isNotEmpty) {
       profileName = fullName;
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_storeScopedKey('customer_id'), session.customerId);
-    await prefs.setString(
-        _storeScopedKey('customer_token'), session.customerToken);
+    await _persistSession(session);
     await prefs.setString(_storeScopedKey('customer_identifier'), identifier);
     if (!identifier.contains("@")) {
       profilePhone = identifier;
@@ -1737,9 +2517,11 @@ class AppState extends ChangeNotifier {
     await loadCustomerData();
   }
 
-  Future<void> signOutCustomer() async {
+  /// Signs out and clears every piece of customer data, in memory and in
+  /// storage, then reloads the retail catalog.
+  Future<void> signOutCustomer({bool notifyServer = true}) async {
     final session = _customerSession;
-    if (_isLiveBackendConnected && session != null) {
+    if (notifyServer && _isLiveBackendConnected && session != null) {
       try {
         await api.logout(session);
       } catch (e) {
@@ -1748,20 +2530,7 @@ class AppState extends ChangeNotifier {
     }
 
     _customerSession = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storeScopedKey('customer_id'));
-    await prefs.remove(_storeScopedKey('customer_token'));
-    await prefs.remove(_storeScopedKey('customer_identifier'));
-    await prefs.remove(_storeScopedKey('customer_username'));
-    await prefs.remove(_storeScopedKey('customer_email'));
-    await prefs.remove(_storeScopedKey('customer_password'));
-    await prefs.remove(_storeScopedKey('customer_dob'));
-    await prefs.remove(_storeScopedKey('customer_gender'));
-    await prefs.remove(_storeScopedKey('customer_profile_image'));
-    await prefs.remove(_storeScopedKey('customer_name'));
-    await prefs.remove(_storeScopedKey('customer_phone'));
-    await prefs.remove(_storeScopedKey('customer_skin_concern'));
-    await prefs.remove(_storeScopedKey('customer_wishlist'));
+    final wasWholesale = _isWholesaleMode;
 
     // Reset profile fields
     profileName = "Store Customer";
@@ -1775,27 +2544,129 @@ class AppState extends ChangeNotifier {
     _accountPassword = null;
 
     // Clear all customer-scoped data to prevent cross-account leakage
+    _orders.clear();
+    _orderTimelines.clear();
     _tickets.clear();
     _notifications.clear();
     _myReviews.clear();
     _wishlist.clear();
     _customerAddresses.clear();
     _savedAddresses.clear();
+    _cart.clear();
+    _cartQuoteDebounce?.cancel();
+    _cartQuoteRequestId++;
+    _cartQuote = null;
+    _isQuotingCart = false;
+    _resetCheckoutAttempt();
 
     _isWholesaleMode = false;
     _wholesaleToken = null;
     _wholesaleMinOrderAmount = 0.0;
 
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in const [
+        'customer_id',
+        'customer_token',
+        'customer_token_expires_at',
+        'customer_identifier',
+        'customer_username',
+        'customer_email',
+        'customer_password',
+        'customer_dob',
+        'customer_gender',
+        'customer_profile_image',
+        'customer_name',
+        'customer_phone',
+        'customer_skin_concern',
+        'customer_wishlist',
+        'customer_cart',
+      ]) {
+        await prefs.remove(_storeScopedKey(key));
+      }
+    } catch (e) {
+      debugPrint("Failed to clear stored customer data: $e");
+    }
+
     notifyListeners();
+
+    if (_isLiveBackendConnected && productsEnabled) {
+      unawaited(_loadProductsForSelectedBranch(
+        preserveOnError: true,
+        background: !wasWholesale,
+      ));
+    }
   }
 
-  Future<void> deleteCustomerAccount() async {
+  /// Deletes the account after the server confirms [password].
+  Future<void> deleteAccount({required String password}) async {
     final session = _customerSession;
     if (session == null) {
-      throw Exception('Must be signed in to delete your account');
+      throw StateError('Sign in to delete your account.');
     }
-    await api.deleteAccount(session);
-    await signOutCustomer();
+    if (password.isEmpty) {
+      throw const StorefrontApiException('Enter your password to confirm.');
+    }
+    await _guardSession(
+        session, () => api.deleteAccount(session, password: password));
+    await signOutCustomer(notifyServer: false);
+  }
+
+  @Deprecated('Use deleteAccount(password: ...); the backend requires the '
+      'password to confirm deletion.')
+  Future<void> deleteCustomerAccount({String? password}) async {
+    if (password == null || password.isEmpty) {
+      throw const StorefrontApiException(
+          'Enter your password to delete your account.');
+    }
+    await deleteAccount(password: password);
+  }
+
+  /// True when [error] means the customer token is no longer valid. Signs
+  /// out (once) and sets [sessionNotice] when it belongs to the current
+  /// session.
+  Future<bool> _handleSessionError(
+      Object error, CustomerSession? session) async {
+    if (error is! StorefrontApiException || !error.isSessionExpired) {
+      return false;
+    }
+    final current = _customerSession;
+    if (current == null ||
+        (session != null && session.customerToken != current.customerToken)) {
+      return true;
+    }
+    _sessionNotice = sessionExpiredNotice;
+    await signOutCustomer(notifyServer: false);
+    return true;
+  }
+
+  /// Runs a customer call; an expired token signs out before rethrowing.
+  Future<T> _guardSession<T>(
+      CustomerSession session, Future<T> Function() call) async {
+    try {
+      return await call();
+    } catch (e) {
+      await _handleSessionError(e, session);
+      rethrow;
+    }
+  }
+
+  Future<void> _persistSession(CustomerSession session) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_storeScopedKey('customer_id'), session.customerId);
+      await prefs.setString(
+          _storeScopedKey('customer_token'), session.customerToken);
+      final expiresAt = session.expiresAt;
+      if (expiresAt != null) {
+        await prefs.setString(_storeScopedKey('customer_token_expires_at'),
+            expiresAt.toIso8601String());
+      } else {
+        await prefs.remove(_storeScopedKey('customer_token_expires_at'));
+      }
+    } catch (e) {
+      debugPrint("Failed to persist customer session: $e");
+    }
   }
 
   Future<void> refreshAllData() async {
@@ -1804,6 +2675,14 @@ class AppState extends ChangeNotifier {
       loadCustomerData(),
     ]);
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _catalogRefreshTimer?.cancel();
+    _cartQuoteDebounce?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> loadCustomerData() async {
@@ -1837,8 +2716,17 @@ class AppState extends ChangeNotifier {
             : Future.value(<Map<String, dynamic>>[]),
       ]);
 
+      if (!identical(_customerSession, session)) {
+        return; // Signed out or switched accounts while loading.
+      }
       final profile = results[0] as Map<String, dynamic>;
       final addresses = results[1] as List<Map<String, dynamic>>;
+      final tokenExpiresAt =
+          CustomerSession.parseExpiry(profile['token_expires_at']);
+      if (tokenExpiresAt != null && tokenExpiresAt != session.expiresAt) {
+        _customerSession = session.copyWith(expiresAt: tokenExpiresAt);
+        unawaited(_persistSession(_customerSession!));
+      }
       final orders = results[2] as List<Map<String, dynamic>>;
       final liveNotifications = results[3] as List<Map<String, dynamic>>;
       final tickets = results[4] as List<Map<String, dynamic>>;
@@ -1886,24 +2774,13 @@ class AppState extends ChangeNotifier {
             .map(CustomerAddress.fromJson)
             .where((address) => address.addressLine1.trim().isNotEmpty)
             .toList();
-        if (mappedAddresses.isNotEmpty) {
-          _customerAddresses
-            ..clear()
-            ..addAll(mappedAddresses);
-          _savedAddresses
-            ..clear()
-            ..addAll(mappedAddresses.map((address) => address.displayLabel));
-        }
-
-        final legacyAddressLabels = addresses
-            .map((address) => CustomerAddress.fromJson(address).displayLabel)
-            .where((address) => address.trim().isNotEmpty)
-            .toList();
-        if (mappedAddresses.isEmpty && legacyAddressLabels.isNotEmpty) {
-          _savedAddresses
-            ..clear()
-            ..addAll(legacyAddressLabels);
-        }
+        // Only real saved addresses; never placeholders.
+        _customerAddresses
+          ..clear()
+          ..addAll(mappedAddresses);
+        _savedAddresses
+          ..clear()
+          ..addAll(mappedAddresses.map((address) => address.displayLabel));
       } else {
         _customerAddresses.clear();
         _savedAddresses.clear();
@@ -1926,6 +2803,8 @@ class AppState extends ChangeNotifier {
         ..clear()
         ..addAll(myReviewsData);
     } catch (e) {
+      if (await _handleSessionError(e, session)) return;
+      if (!identical(_customerSession, session)) return;
       _customerAddresses.clear();
       _savedAddresses.clear();
       _orders.clear();
@@ -1964,6 +2843,7 @@ class AppState extends ChangeNotifier {
           timeline.map(OrderTimelineStep.fromJson).toList();
       notifyListeners();
     } catch (e) {
+      await _handleSessionError(e, session);
       debugPrint("Storefront order detail kept local: $e");
     }
   }
@@ -1975,8 +2855,8 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final updatedPayload =
-          await api.cancelOrder(orderId: orderId, session: session);
+      final updatedPayload = await _guardSession(
+          session, () => api.cancelOrder(orderId: orderId, session: session));
       if (updatedPayload.isNotEmpty) {
         final liveOrder = _orderFromPayload(updatedPayload);
         final index = _orders.indexWhere((order) => order.id == orderId);
@@ -1992,29 +2872,52 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> saveCustomerAddress(CustomerAddress address) async {
+  /// Creates or updates [address] and returns the saved address so the UI
+  /// can select it.
+  Future<CustomerAddress> saveCustomerAddress(CustomerAddress address) async {
     final session = _customerSession;
     if (session == null) {
-      _upsertLocalAddress(address);
-      return;
+      final local = _upsertLocalAddress(address);
+      notifyListeners();
+      return local;
     }
 
-    final saved = address.id.isEmpty
-        ? await api.createAddress(
-            session: session, address: address.toPayload())
-        : await api.updateAddress(
-            session: session,
-            addressId: address.id,
-            address: address.toPayload(),
-          );
-    _upsertLocalAddress(CustomerAddress.fromJson(saved));
+    final saved = await _guardSession(
+      session,
+      () => address.id.isEmpty
+          ? api.createAddress(session: session, address: address.toPayload())
+          : api.updateAddress(
+              session: session,
+              addressId: address.id,
+              address: address.toPayload(),
+            ),
+    );
+    var savedAddress = CustomerAddress.fromJson(saved);
+    if (savedAddress.id.isEmpty || savedAddress.addressLine1.trim().isEmpty) {
+      // Some responses only echo the id; keep what the customer entered.
+      savedAddress = CustomerAddress(
+        id: savedAddress.id.isNotEmpty ? savedAddress.id : address.id,
+        label: address.label,
+        recipientName: address.recipientName,
+        recipientPhone: address.recipientPhone,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        city: address.city,
+        state: address.state,
+        postalCode: address.postalCode,
+        country: address.country,
+      );
+    }
+    final result = _upsertLocalAddress(savedAddress, replacing: address);
     notifyListeners();
+    return result;
   }
 
   Future<void> deleteCustomerAddress(CustomerAddress address) async {
     final session = _customerSession;
     if (session != null && address.id.isNotEmpty) {
-      await api.deleteAddress(session: session, addressId: address.id);
+      await _guardSession(session,
+          () => api.deleteAddress(session: session, addressId: address.id));
     }
     _customerAddresses.removeWhere((entry) =>
         entry.id.isNotEmpty && entry.id == address.id ||
@@ -2022,13 +2925,11 @@ class AppState extends ChangeNotifier {
     _savedAddresses
       ..clear()
       ..addAll(_customerAddresses.map((entry) => entry.displayLabel));
-    if (_savedAddresses.isEmpty) {
-      _savedAddresses.add("100 Market Street, Suite 12");
-    }
     notifyListeners();
   }
 
-  void _upsertLocalAddress(CustomerAddress address) {
+  CustomerAddress _upsertLocalAddress(CustomerAddress address,
+      {CustomerAddress? replacing}) {
     final normalized = address.id.isEmpty
         ? CustomerAddress(
             id: 'local-${DateTime.now().millisecondsSinceEpoch}',
@@ -2043,9 +2944,13 @@ class AppState extends ChangeNotifier {
             country: address.country,
           )
         : address;
-    final index = _customerAddresses.indexWhere((entry) =>
+    var index = _customerAddresses.indexWhere((entry) =>
         entry.id.isNotEmpty && entry.id == normalized.id ||
         entry.displayLabel == normalized.displayLabel);
+    if (index < 0 && replacing != null && replacing.id.isNotEmpty) {
+      index =
+          _customerAddresses.indexWhere((entry) => entry.id == replacing.id);
+    }
     if (index >= 0) {
       _customerAddresses[index] = normalized;
     } else {
@@ -2054,13 +2959,7 @@ class AppState extends ChangeNotifier {
     _savedAddresses
       ..clear()
       ..addAll(_customerAddresses.map((entry) => entry.displayLabel));
-  }
-
-  int? _addressIdForLabel(String label) {
-    final match = _customerAddresses.where((address) {
-      return address.displayLabel == label && int.tryParse(address.id) != null;
-    }).toList();
-    return match.isEmpty ? null : int.tryParse(match.first.id);
+    return normalized;
   }
 
   Future<void> _restoreCustomerSession() async {
@@ -2068,6 +2967,8 @@ class AppState extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final customerId = prefs.getInt(_storeScopedKey('customer_id'));
       final customerToken = prefs.getString(_storeScopedKey('customer_token'));
+      final tokenExpiresAt = CustomerSession.parseExpiry(
+          prefs.getString(_storeScopedKey('customer_token_expires_at')));
       final identifier =
           prefs.getString(_storeScopedKey('customer_identifier'));
 
@@ -2099,10 +3000,18 @@ class AppState extends ChangeNotifier {
           customerId > 0 &&
           customerToken != null &&
           customerToken.isNotEmpty) {
-        _customerSession = CustomerSession(
+        final restored = CustomerSession(
           customerId: customerId,
           customerToken: customerToken,
+          expiresAt: tokenExpiresAt,
         );
+        if (restored.isExpired) {
+          _customerSession = restored;
+          _sessionNotice = sessionExpiredNotice;
+          await signOutCustomer(notifyServer: false);
+          return;
+        }
+        _customerSession = restored;
         if (identifier != null && identifier.isNotEmpty) {
           profileUsername = identifier;
         }
@@ -2122,9 +3031,10 @@ class AppState extends ChangeNotifier {
 
     if (_isLiveBackendConnected && _customerSession != null) {
       try {
-        final updatedProfile = await api.updateProfile(
-          session: _customerSession!,
-          name: nextName,
+        final session = _customerSession!;
+        final updatedProfile = await _guardSession(
+          session,
+          () => api.updateProfile(session: session, name: nextName),
         );
         profileName = (updatedProfile['full_name'] ??
                 updatedProfile['name'] ??
@@ -2149,66 +3059,123 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> uploadProfileImage(String imagePath) async {
+  static const _maxProfileImageBytes = 5 * 1024 * 1024;
+
+  /// Uploads a picked image (web-safe: bytes, no dart:io) and returns the
+  /// new profile image URL.
+  Future<String> uploadProfileImage(XFile file) async {
     final session = _customerSession;
     if (session == null) {
       throw StateError('Sign in to update your profile picture.');
     }
-    final file = File(imagePath);
-    final extension = imagePath.split('.').last.toLowerCase();
+    final name = _fileNameOf(file);
+    final dot = name.lastIndexOf('.');
+    final extension = dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
     const allowedExtensions = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
-    if (!allowedExtensions.contains(extension)) {
+    const allowedMimeTypes = {
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp'
+    };
+    final mimeType = file.mimeType?.toLowerCase();
+    final typeAllowed = allowedExtensions.contains(extension) ||
+        (extension.isEmpty &&
+            mimeType != null &&
+            allowedMimeTypes.contains(mimeType));
+    if (!typeAllowed) {
       throw ArgumentError('Choose a JPEG, PNG, GIF, or WebP image.');
     }
-    if (!await file.exists() || await file.length() > 5 * 1024 * 1024) {
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty || bytes.length > _maxProfileImageBytes) {
       throw ArgumentError('Choose an image smaller than 5 MB.');
     }
-    final profile = await api.uploadProfileImage(
-      session: session,
-      filePath: imagePath,
+    final profile = await _guardSession(
+      session,
+      () => api.uploadProfileImage(
+        session: session,
+        bytes: bytes,
+        filename: name,
+        mimeType: allowedMimeTypes.contains(mimeType) ? mimeType : null,
+      ),
     );
     final imageUrl = profile['profile_image_url']?.toString();
     if (imageUrl == null || imageUrl.isEmpty) {
       throw const StorefrontApiException(
           'The profile picture could not be saved.');
     }
-    profileImageUrl = api.resolveMediaUrl(imageUrl);
+    final resolved = api.resolveMediaUrl(imageUrl);
+    profileImageUrl = resolved;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-          _storeScopedKey('customer_profile_image'), profileImageUrl!);
+          _storeScopedKey('customer_profile_image'), resolved);
     } catch (e) {
       debugPrint("Failed to persist profile image locally: $e");
     }
     notifyListeners();
+    return resolved;
   }
 
   Future<void> removeProfileImage() async {
     final session = _customerSession;
     if (session == null) return;
-    await api.removeProfileImage(session);
+    await _guardSession(session, () => api.removeProfileImage(session));
     profileImageUrl = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storeScopedKey('customer_profile_image'));
     notifyListeners();
   }
 
-  Future<void> updatePassword(String newPassword) async {
-    if (_isLiveBackendConnected && _customerSession != null) {
-      try {
-        await api.updateProfile(
-          session: _customerSession!,
-          name: profileName,
-          password: newPassword,
-        );
-      } catch (e) {
-        debugPrint("Failed to update password on backend: $e");
-        rethrow;
-      }
+  /// Changes the password on the server, which verifies [currentPassword].
+  /// The session stays valid; a rotated token from the server replaces it.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final session = _customerSession;
+    if (session == null) {
+      throw StateError('Sign in to change your password.');
     }
-
+    if (!_isLiveBackendConnected) {
+      throw const StorefrontApiException(
+          'Password changes are unavailable while the store backend is offline.');
+    }
+    if (currentPassword.isEmpty) {
+      throw const StorefrontApiException('Enter your current password.');
+    }
+    if (newPassword.isEmpty) {
+      throw const StorefrontApiException('Enter a new password.');
+    }
+    final data = await _guardSession(
+      session,
+      () => api.changePassword(
+        session: session,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      ),
+    );
+    final rotatedToken =
+        (data['token'] ?? data['customer_token'])?.toString().trim() ?? '';
+    if (rotatedToken.isNotEmpty && identical(_customerSession, session)) {
+      _customerSession = session.copyWith(
+        customerToken: rotatedToken,
+        expiresAt: CustomerSession.parseExpiry(data['token_expires_at']),
+      );
+      await _persistSession(_customerSession!);
+    }
     notifyListeners();
-    await signOutCustomer();
+  }
+
+  @Deprecated('Use changePassword(currentPassword:, newPassword:); the '
+      'backend requires the current password.')
+  Future<void> updatePassword(String newPassword,
+      {String? currentPassword}) async {
+    if (currentPassword == null || currentPassword.isEmpty) {
+      throw const StorefrontApiException('Enter your current password.');
+    }
+    await changePassword(
+        currentPassword: currentPassword, newPassword: newPassword);
   }
 
   Future<void> registerWithPassword({
@@ -2238,10 +3205,8 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    _customerSession = CustomerSession(
-      customerId: session.customerId,
-      customerToken: session.customerToken,
-    );
+    _customerSession = session;
+    _sessionNotice = null;
 
     profileName = normalizeFullName(name);
     profileEmail = '';
@@ -2250,9 +3215,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_storeScopedKey('customer_id'), session.customerId);
-      await prefs.setString(
-          _storeScopedKey('customer_token'), session.customerToken);
+      await _persistSession(session);
       await prefs.setString(
           _storeScopedKey('customer_identifier'), normalizedUsername);
       await prefs.setString(_storeScopedKey('customer_name'), profileName);
@@ -2289,10 +3252,9 @@ class AppState extends ChangeNotifier {
         password: password,
       );
       _customerSession = session;
+      _sessionNotice = null;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_storeScopedKey('customer_id'), session.customerId);
-      await prefs.setString(
-          _storeScopedKey('customer_token'), session.customerToken);
+      await _persistSession(session);
       await prefs.setString(
           _storeScopedKey('customer_identifier'), normalizedUsername);
       await prefs.remove(_storeScopedKey('customer_email'));
@@ -2340,8 +3302,6 @@ class AppState extends ChangeNotifier {
               imageUrl: item['image_url']?.toString() ?? '',
               category: 'General',
               stockQuantity: 1,
-              rating: 4.5,
-              reviewsCount: 0,
               skinTypes: const ['All Skintypes'],
               ingredients: '',
               volume: '',
@@ -2382,6 +3342,9 @@ class AppState extends ChangeNotifier {
         [];
 
     final pricing = (json['pricing'] as Map<String, dynamic>?) ?? json;
+    final orderType =
+        (json['order_type']?.toString() ?? 'delivery').toLowerCase();
+    final branchName = _orderBranchName(json);
     return AppOrder(
       id: (json['order_number'] ??
               json['order_code'] ??
@@ -2398,12 +3361,55 @@ class AppState extends ChangeNotifier {
       status: _titleCase(json['status']?.toString() ?? 'Pending'),
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),
-      address: (json['address'] ??
-              json['delivery_address'] ??
-              json['delivery_address_snapshot'] ??
-              selectedBranch)
-          .toString(),
+      address: orderType == 'delivery'
+          ? _orderDeliveryAddressText(json)
+          : branchName,
+      fulfillmentMode: json['fulfillment_mode']?.toString() ?? 'standard',
+      preorderEtaText: json['preorder_eta_text']?.toString() ?? '',
+      splitFromOrderNumber: json['split_from_order_number']?.toString() ?? '',
+      branchName: branchName,
+      notes: (json['notes'] ?? json['customer_notes'] ?? '').toString(),
     );
+  }
+
+  /// The order's own branch (never the currently selected one).
+  String _orderBranchName(Map<String, dynamic> json) {
+    final name = json['branch_name']?.toString().trim() ?? '';
+    if (name.isNotEmpty) return name;
+    final branchId = int.tryParse(json['branch_id']?.toString() ?? '');
+    for (final branch in _branchRecords) {
+      if (branch.id == branchId) return branch.name;
+    }
+    return '';
+  }
+
+  /// A readable address from the order's address snapshot, which may be a
+  /// map, a JSON string or plain text.
+  String _orderDeliveryAddressText(Map<String, dynamic> json) {
+    final raw = json['delivery_address_snapshot'] ??
+        json['delivery_address'] ??
+        json['address'];
+    dynamic value = raw;
+    if (raw is String) {
+      final trimmed = raw.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          value = jsonDecode(trimmed);
+        } catch (_) {
+          return trimmed;
+        }
+      } else {
+        return trimmed;
+      }
+    }
+    if (value is Map) {
+      final address =
+          CustomerAddress.fromJson(Map<String, dynamic>.from(value));
+      final text = address.formattedAddress;
+      if (text.isNotEmpty) return text;
+      return address.label == 'Address' ? '' : address.label;
+    }
+    return '';
   }
 
   SupportTicket _ticketFromPayload(Map<String, dynamic> json) {
@@ -2518,14 +3524,7 @@ Map<String, bool> _parseFeatureFlags(Map<String, dynamic> config) {
   if (rawFeatures is Map) {
     rawFeatures.forEach((key, value) {
       if (value is Map) {
-        final isActive = _truthyFeatureFlag(
-          value['feature_is_active'] ??
-              value['store_is_active'] ??
-              value['is_active'] ??
-              value['enabled'] ??
-              value['value'] ??
-              true,
-        );
+        final isActive = _featureRowIsActive(value);
         final canView = _truthyFeatureFlag(
           value['can_view'] ??
               (value['actions'] is Map
@@ -2547,14 +3546,7 @@ Map<String, bool> _parseFeatureFlags(Map<String, dynamic> config) {
       } else if (item is Map) {
         final key = item['feature_key'] ?? item['key'] ?? item['name'];
         if (key != null) {
-          final isActive = _truthyFeatureFlag(
-            item['feature_is_active'] ??
-                item['store_is_active'] ??
-                item['is_active'] ??
-                item['enabled'] ??
-                item['value'] ??
-                true,
-          );
+          final isActive = _featureRowIsActive(item);
           final canView = _truthyFeatureFlag(
             item['can_view'] ??
                 (item['actions'] is Map
@@ -2569,6 +3561,19 @@ Map<String, bool> _parseFeatureFlags(Map<String, dynamic> config) {
   }
 
   return flags;
+}
+
+/// A feature is active only when both the platform feature and the store's
+/// own switch are on; a store-level disable is never ignored.
+bool _featureRowIsActive(Map value) {
+  if (value.containsKey('feature_is_active') ||
+      value.containsKey('store_is_active')) {
+    return _truthyFeatureFlag(value['feature_is_active'] ?? true) &&
+        _truthyFeatureFlag(value['store_is_active'] ?? true);
+  }
+  return _truthyFeatureFlag(
+    value['is_active'] ?? value['enabled'] ?? value['value'] ?? true,
+  );
 }
 
 bool _truthyFeatureFlag(dynamic value) {

@@ -493,8 +493,12 @@ class _AddressesScreenState extends State<AddressesScreen> {
                                       // If the save fails, show the error toast
                                       // on the parent context.
                                       if (context.mounted) {
-                                        showTopToast(context,
-                                            'Failed to save address: $e');
+                                        showTopToast(
+                                          context,
+                                          userFacingError(e,
+                                              fallback:
+                                                  'Unable to save the address. Please try again.'),
+                                        );
                                       }
                                     }
                                   },

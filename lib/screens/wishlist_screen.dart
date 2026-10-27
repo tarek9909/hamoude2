@@ -229,17 +229,17 @@ class WishlistScreen extends StatelessWidget {
                                               product.variants.length == 1
                                                   ? product.variants.first
                                                   : null;
-                                          final added = appState.addToCart(
-                                              product,
-                                              variant: variant);
-                                          final stockQuantity =
-                                              variant?.stockQuantity ??
-                                                  product.stockQuantity;
+                                          final blockReason =
+                                              appState.cartAddBlockReason(
+                                                  product, 1, variant);
+                                          if (blockReason == null) {
+                                            appState.addToCart(product,
+                                                variant: variant);
+                                          }
                                           showTopToast(
                                             context,
-                                            added
-                                                ? '${product.name} added to bag'
-                                                : 'Only $stockQuantity items in stock.',
+                                            blockReason ??
+                                                '${product.name} added to bag',
                                           );
                                         },
                                         child: Text(

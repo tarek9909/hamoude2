@@ -74,12 +74,19 @@ class OffersScreen extends StatelessWidget {
         final title =
             promo['name']?.toString() ?? promo['title']?.toString() ?? '';
         final discountType = promo['discount_type']?.toString() ?? 'percentage';
-        final discountVal =
-            (promo['discount_value'] as num?)?.toDouble() ?? 20.0;
+        final rawDiscount = promo['discount_value'];
+        // No invented fallback: without a discount value there is no discount.
+        final double discountVal = (rawDiscount is num
+                ? rawDiscount.toDouble()
+                : double.tryParse(rawDiscount?.toString() ?? '')) ??
+            0.0;
+        final hasDiscount = discountVal > 0;
         final discountLabel = promo['discount_label']?.toString() ??
             promo['badge']?.toString() ??
-            (discountType == 'percentage'
-                ? '-${discountVal.toStringAsFixed(0)}% OFF'
+            (hasDiscount
+                ? (discountType == 'percentage'
+                    ? '-${discountVal.toStringAsFixed(0)}% OFF'
+                    : '-\$${discountVal.toStringAsFixed(discountVal % 1 == 0 ? 0 : 2)} OFF')
                 : 'SPECIAL OFFER');
 
         final rawItems = promo['product_links'] as List? ?? [];
@@ -110,7 +117,7 @@ class OffersScreen extends StatelessWidget {
               promoPriceStr != null &&
               double.tryParse(promoPriceStr) != null) {
             discPrice = double.parse(promoPriceStr);
-          } else {
+          } else if (hasDiscount) {
             if (discountType == 'percentage') {
               discPrice = product.price * (1 - discountVal / 100);
             } else {
@@ -246,7 +253,9 @@ class OffersScreen extends StatelessWidget {
                         final discount = item['discountLabel'] as String;
                         return ProductCard(
                           product: product,
-                          discountedPrice: discPrice,
+                          // Only pass a discounted price when it is lower.
+                          discountedPrice:
+                              discPrice < product.price ? discPrice : null,
                           discountLabel: discount,
                         );
                       },

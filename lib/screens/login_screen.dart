@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/top_toast.dart';
+import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -41,11 +42,6 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (password.length < 8) {
-      showTopToast(context, 'Password must be at least 8 characters long.');
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
@@ -58,7 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showTopToast(context, e.toString().replaceAll('Exception: ', ''));
+        showTopToast(
+            context,
+            userFacingError(e,
+                fallback: 'Unable to sign in. Please try again.'));
       }
     } finally {
       if (mounted) {
@@ -275,13 +274,42 @@ class _LoginScreenState extends State<LoginScreen> {
                                     prefixIcon: Icons.lock_outline,
                                     obscureText: true,
                                   ),
-                                  const SizedBox(height: 28),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: _isLoading
+                                          ? null
+                                          : () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      ForgotPasswordScreen(
+                                                    identifier:
+                                                        _usernameController.text
+                                                            .trim(),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                      child: Text(
+                                        'Forgot password?',
+                                        style: GoogleFonts.manrope(
+                                          fontSize: 12,
+                                          color: AppTheme.primary,
+                                          fontWeight: FontWeight.w700,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
                                   SizedBox(
                                     width: double.infinity,
                                     height: 52,
                                     child: ElevatedButton(
                                       onPressed:
-                                          _isLoading ? () {} : _handleLogin,
+                                          _isLoading ? null : _handleLogin,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.primary,
                                         foregroundColor: Colors.white,

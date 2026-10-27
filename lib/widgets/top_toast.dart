@@ -3,6 +3,51 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 
+/// Turns an error into a short, user-facing message for a toast.
+///
+/// Messages that look like raw server output (JSON, HTML, stack traces or
+/// very long bodies) are replaced by [fallback] so customers never see them.
+String userFacingError(Object? error,
+    {String fallback = 'Something went wrong. Please try again.'}) {
+  if (error == null) return fallback;
+  String? raw;
+  if (error is ArgumentError) {
+    raw = error.message?.toString();
+  } else if (error is StateError) {
+    raw = error.message;
+  } else if (error is TimeoutException) {
+    return 'The request timed out. Please check your connection and try again.';
+  } else {
+    raw = error.toString();
+  }
+  if (raw == null) return fallback;
+  var message = raw.trim();
+  for (final prefix in const [
+    'Exception: ',
+    'Bad state: ',
+    'Invalid argument(s): ',
+    'StorefrontApiException: ',
+  ]) {
+    if (message.startsWith(prefix)) {
+      message = message.substring(prefix.length).trim();
+    }
+  }
+  final lower = message.toLowerCase();
+  final looksRaw = message.isEmpty ||
+      message.length > 220 ||
+      message.startsWith('{') ||
+      message.startsWith('[') ||
+      message.startsWith('<') ||
+      lower.contains('<html') ||
+      lower.contains('<!doctype') ||
+      lower.contains('socketexception') ||
+      lower.contains('clientexception') ||
+      lower.contains('formatexception') ||
+      lower.contains('stack trace') ||
+      lower.contains('instance of ');
+  return looksRaw ? fallback : message;
+}
+
 void showTopToast(BuildContext context, String message,
     {String? actionLabel, VoidCallback? onActionPressed}) {
   final overlayState = Overlay.of(context);

@@ -127,4 +127,199 @@ void main() {
     expect(session.customerId, 11);
     expect(session.customerToken, 'token-11');
   });
+
+  StorefrontApi capturingApi(
+    List<http.Request> captured, {
+    int status = 200,
+    String? body,
+  }) {
+    return StorefrontApi(
+      baseUrl: 'http://example.test/api/v1/storefront',
+      storeSlug: 'skin-cella',
+      client: MockClient((request) async {
+        captured.add(request);
+        return http.Response(
+          body ?? jsonEncode({'success': true, 'data': {}}),
+          status,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+  }
+
+  const session = CustomerSession(customerId: 7, customerToken: 'token-7');
+
+  test('PATCH me sends only full_name', () async {
+    final captured = <http.Request>[];
+    await capturingApi(captured)
+        .updateProfile(session: session, name: 'Maya Customer');
+
+    expect(captured.single.method, 'PATCH');
+    expect(captured.single.url.path, '/api/v1/storefront/skin-cella/me');
+    expect(jsonDecode(captured.single.body), {'full_name': 'Maya Customer'});
+    expect(captured.single.headers['x-customer-token'], 'token-7');
+  });
+
+  test('change password posts current and new password', () async {
+    final captured = <http.Request>[];
+    await capturingApi(captured).changePassword(
+      session: session,
+      currentPassword: 'old-pass',
+      newPassword: 'new-pass-123',
+    );
+
+    expect(captured.single.method, 'POST');
+    expect(captured.single.url.path,
+        '/api/v1/storefront/skin-cella/me/change-password');
+    expect(jsonDecode(captured.single.body), {
+      'current_password': 'old-pass',
+      'new_password': 'new-pass-123',
+    });
+  });
+
+  test('delete account sends the password', () async {
+    final captured = <http.Request>[];
+    await capturingApi(captured).deleteAccount(session, password: 'secret-1');
+
+    expect(captured.single.method, 'DELETE');
+    expect(captured.single.url.path, '/api/v1/storefront/skin-cella/me');
+    expect(jsonDecode(captured.single.body), {'password': 'secret-1'});
+  });
+
+  test('password reset request sends the username and returns message',
+      () async {
+    final captured = <http.Request>[];
+    final result = await capturingApi(
+      captured,
+      body: jsonEncode({
+        'success': true,
+        'message': 'Your reset request was sent. The store will contact you.',
+        'data': {'mode': 'admin_review'},
+      }),
+    ).requestPasswordReset('maya.customer');
+
+    expect(captured.single.url.path,
+        '/api/v1/storefront/skin-cella/auth/password-reset-request');
+    expect(jsonDecode(captured.single.body), {'username': 'maya.customer'});
+    expect(result['mode'], 'admin_review');
+    expect(result['message'],
+        'Your reset request was sent. The store will contact you.');
+  });
+
+  test('mark all notifications read posts to read-all', () async {
+    final captured = <http.Request>[];
+    await capturingApi(captured).markAllNotificationsRead(session);
+
+    expect(captured.single.method, 'POST');
+    expect(captured.single.url.path,
+        '/api/v1/storefront/skin-cella/notifications/read-all');
+  });
+
+  test('checkout sends the given idempotency key and notes', () async {
+    final captured = <http.Request>[];
+    const product = Product(
+      id: '101',
+      name: 'Barrier Cream',
+      description: '',
+      shortDescription: '',
+      price: 18.0,
+      imageUrl: '',
+      category: 'Moisturizers',
+      stockQuantity: 2,
+      skinTypes: ['All'],
+      ingredients: '',
+      brand: 'Skin Cella',
+    );
+    await capturingApi(captured).checkout(
+      branchId: 10,
+      items: [CartItem(product: product)],
+      orderType: 'pickup',
+      notes: 'Leave at door',
+      idempotencyKey: 'skin-cella-key-1',
+    );
+
+    final body = jsonDecode(captured.single.body) as Map<String, dynamic>;
+    expect(body['idempotency_key'], 'skin-cella-key-1');
+    expect(body['notes'], 'Leave at door');
+  });
+
+  test('non-JSON error pages become StorefrontApiException', () async {
+    final api = capturingApi([], status: 502, body: '<html>Bad Gateway</html>');
+
+    await expectLater(
+      api.getConfig(),
+      throwsA(isA<StorefrontApiException>()
+          .having((e) => e.statusCode, 'statusCode', 502)),
+    );
+  });
+
+  test('401 customer token failures are flagged as expired sessions', () async {
+    final api = capturingApi(
+      [],
+      status: 401,
+      body: jsonEncode({
+        'success': false,
+        'message': 'Invalid or expired customer token',
+      }),
+    );
+
+    await expectLater(
+      api.getProfile(session),
+      throwsA(isA<StorefrontApiException>()
+          .having((e) => e.isSessionExpired, 'isSessionExpired', isTrue)),
+    );
+  });
+
+  test('login parses token expiry', () async {
+    final api = capturingApi(
+      [],
+      body: jsonEncode({
+        'success': true,
+        'data': {
+          'customer_token': 'token-9',
+          'token_expires_at': '2030-01-01T00:00:00.000Z',
+          'customer': {'id': 9},
+        },
+      }),
+    );
+
+    final login = await api.loginWithPassword(username: 'maya', password: 'pw');
+    expect(login.customerId, 9);
+    expect(login.expiresAt, DateTime.utc(2030));
+    expect(login.isExpired, isFalse);
+  });
+
+  test('legacy wholesale rows per variant merge into one product', () async {
+    final api = capturingApi(
+      [],
+      body: jsonEncode({
+        'success': true,
+        'data': [
+          {
+            'id': 5,
+            'variant_id': 51,
+            'name': 'Serum',
+            'variant_name': '30ml',
+            'price': '10.00',
+            'available_qty': 2,
+          },
+          {
+            'id': 5,
+            'variant_id': 52,
+            'name': 'Serum',
+            'variant_name': '50ml',
+            'price': '14.00',
+            'available_qty': 3,
+          },
+        ],
+        'meta': {'total_pages': 1},
+      }),
+    );
+
+    final products =
+        await api.listWholesaleProducts(wholesaleToken: 'wholesale-token');
+    expect(products, hasLength(1));
+    expect(products.single.variants.map((v) => v.id), ['51', '52']);
+    expect(products.single.variants.last.price, 14.0);
+  });
 }

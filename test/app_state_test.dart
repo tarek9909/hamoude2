@@ -8,7 +8,17 @@ class FakeStorefrontApi extends StorefrontApi {
   String? lastCreatedTicketCategory;
   String? lastRepliedTicketId;
   String? lastRepliedMessage;
-  String? lastUpdatedProfilePassword;
+  String? lastUpdatedProfileName;
+  String? lastUpdatedProfilePhone;
+  String? lastChangePasswordCurrent;
+  String? lastChangePasswordNew;
+  String? lastDeleteAccountPassword;
+  bool markAllReadCalled = false;
+  final List<String?> checkoutIdempotencyKeys = [];
+  int failNextCheckouts = 0;
+  Object? listOrdersError;
+  List<Product> liveProducts = const [];
+  Map<String, dynamic>? quoteResponse;
   String? lastRegisteredName;
   String? lastRegisteredUsername;
   String? lastRegisteredPassword;
@@ -18,6 +28,7 @@ class FakeStorefrontApi extends StorefrontApi {
   CustomerSession? lastLoggedOutSession;
   List<CartItem>? lastCheckoutItems;
   String? lastCheckoutOrderType;
+  String? lastCheckoutNotes;
 
   FakeStorefrontApi()
       : super(
@@ -85,7 +96,19 @@ class FakeStorefrontApi extends StorefrontApi {
     String? search,
     String? categoryId,
   }) async {
-    return const [];
+    return liveProducts;
+  }
+
+  @override
+  Future<Map<String, dynamic>> quoteCart({
+    required int branchId,
+    required List<CartItem> items,
+    String orderType = 'delivery',
+    int? deliveryZoneId,
+    CustomerSession? session,
+    String? wholesaleToken,
+  }) async {
+    return quoteResponse ?? {};
   }
 
   @override
@@ -160,9 +183,10 @@ class FakeStorefrontApi extends StorefrontApi {
   Future<Map<String, dynamic>> updateProfile({
     required CustomerSession session,
     required String name,
-    String? password,
+    String? phone,
   }) async {
-    lastUpdatedProfilePassword = password;
+    lastUpdatedProfileName = name;
+    lastUpdatedProfilePhone = phone;
     return {
       'id': session.customerId,
       'full_name': name,
@@ -172,6 +196,31 @@ class FakeStorefrontApi extends StorefrontApi {
   @override
   Future<void> logout(CustomerSession session) async {
     lastLoggedOutSession = session;
+  }
+
+  @override
+  Future<Map<String, dynamic>> changePassword({
+    required CustomerSession session,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    lastChangePasswordCurrent = currentPassword;
+    lastChangePasswordNew = newPassword;
+    return {'reauthentication_required': false};
+  }
+
+  @override
+  Future<void> deleteAccount(
+    CustomerSession session, {
+    String? password,
+    String? verificationToken,
+  }) async {
+    lastDeleteAccountPassword = password;
+  }
+
+  @override
+  Future<void> markAllNotificationsRead(CustomerSession session) async {
+    markAllReadCalled = true;
   }
 
   @override
@@ -192,6 +241,8 @@ class FakeStorefrontApi extends StorefrontApi {
 
   @override
   Future<List<Map<String, dynamic>>> listOrders(CustomerSession session) async {
+    final error = listOrdersError;
+    if (error != null) throw error;
     return [
       {
         'id': 901,
@@ -274,9 +325,10 @@ class FakeStorefrontApi extends StorefrontApi {
 
   @override
   Future<Map<String, dynamic>> uploadSupportAttachment({
-    required String filePath,
+    required List<int> bytes,
     required String filename,
     required CustomerSession session,
+    String? mimeType,
   }) async {
     return {};
   }
@@ -374,7 +426,10 @@ class FakeStorefrontApi extends StorefrontApi {
   @override
   Future<Map<String, dynamic>> requestPasswordReset(String identifier) async {
     lastPasswordResetIdentifier = identifier;
-    return {'submitted': true};
+    return {
+      'mode': 'admin_review',
+      'message': 'Your reset request was sent. The store will contact you.',
+    };
   }
 
   @override
@@ -399,6 +454,7 @@ class FakeStorefrontApi extends StorefrontApi {
     int? deliveryZoneId,
     String? notes,
     String? pickupTime,
+    String? idempotencyKey,
   }) async {
     lastCheckoutItems = List<CartItem>.from(items);
     lastCheckoutOrderType = orderType;
@@ -425,9 +481,17 @@ class FakeStorefrontApi extends StorefrontApi {
     int? deliveryZoneId,
     String? notes,
     String? pickupTime,
+    String? idempotencyKey,
   }) async {
     lastCheckoutItems = List<CartItem>.from(items);
     lastCheckoutOrderType = orderType;
+    lastCheckoutNotes = notes;
+    checkoutIdempotencyKeys.add(idempotencyKey);
+    if (failNextCheckouts > 0) {
+      failNextCheckouts--;
+      throw const StorefrontApiException(
+          'The store took too long to respond. Check your connection and try again.');
+    }
     return {
       'order_id': 'CHECKOUT-901',
       'order_number': 'CHECKOUT-901',
@@ -1171,14 +1235,16 @@ void main() {
     expect(secondState.cart.single.quantity, 1);
   });
 
-  test('password reset request uses admin approval endpoint', () async {
+  test('password reset request sends the username and returns server message',
+      () async {
     final fakeApi = FakeStorefrontApi();
     final appState = AppState(api: fakeApi);
     await appState.refreshStorefrontData();
 
-    await appState.requestPasswordReset('+96170000000');
+    final message = await appState.requestPasswordReset(' maya.customer ');
 
-    expect(fakeApi.lastPasswordResetIdentifier, '+96170000000');
+    expect(fakeApi.lastPasswordResetIdentifier, 'maya.customer');
+    expect(message, 'Your reset request was sent. The store will contact you.');
   });
 
   test('product model preserves retail and wholesale prices', () {
@@ -1194,5 +1260,262 @@ void main() {
     expect(product.price, 22.5);
     expect(product.retailPrice, 30.0);
     expect(product.wholesalePrice, 22.5);
+  });
+
+  Future<AppState> signedInState(FakeStorefrontApi fakeApi) async {
+    final appState = AppState(api: fakeApi);
+    await appState.refreshStorefrontData();
+    await appState.loginWithPassword(
+      username: 'maya.customer',
+      password: 'super-secure-password',
+    );
+    return appState;
+  }
+
+  test('empty cart is persisted after a successful checkout', () async {
+    final fakeApi = FakeStorefrontApi();
+    final appState = AppState(api: fakeApi);
+    await appState.refreshStorefrontData();
+    // Let the constructor's async session/cart restore finish first.
+    await Future<void>.delayed(Duration.zero);
+
+    expect(appState.addToCart(_stockedProduct), isTrue);
+    final order = await appState.checkout('Pickup', 'Main Branch',
+        notes: 'Ring the bell');
+
+    expect(order.id, 'CHECKOUT-901');
+    expect(order.address, 'Main Branch');
+    expect(order.branchName, 'Main Branch');
+    expect(fakeApi.lastCheckoutNotes, 'Ring the bell');
+    expect(appState.cart, isEmpty);
+    await Future<void>.delayed(Duration.zero);
+
+    final restored = AppState(api: FakeStorefrontApi());
+    await Future<void>.delayed(Duration.zero);
+    expect(restored.cart, isEmpty);
+  });
+
+  test('checkout throws on an empty bag instead of returning null', () async {
+    final appState = AppState(api: FakeStorefrontApi());
+    await appState.refreshStorefrontData();
+
+    await expectLater(
+      appState.checkout('Pickup', 'Main Branch'),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test('checkout retry after a timeout reuses the idempotency key', () async {
+    final fakeApi = FakeStorefrontApi()..failNextCheckouts = 1;
+    final appState = AppState(api: fakeApi);
+    await appState.refreshStorefrontData();
+
+    expect(appState.addToCart(_stockedProduct), isTrue);
+    await expectLater(appState.checkout('Pickup', 'Main Branch'),
+        throwsA(isA<StorefrontApiException>()));
+    expect(appState.cart, hasLength(1));
+    await appState.checkout('Pickup', 'Main Branch');
+
+    expect(fakeApi.checkoutIdempotencyKeys, hasLength(2));
+    expect(fakeApi.checkoutIdempotencyKeys.first, isNotNull);
+    expect(fakeApi.checkoutIdempotencyKeys[1],
+        fakeApi.checkoutIdempotencyKeys.first);
+
+    expect(appState.addToCart(_stockedProduct), isTrue);
+    await appState.checkout('Pickup', 'Main Branch');
+    expect(fakeApi.checkoutIdempotencyKeys[2],
+        isNot(fakeApi.checkoutIdempotencyKeys.first));
+  });
+
+  test('variant cart line survives refresh when the list has no variants',
+      () async {
+    final fakeApi = FakeStorefrontApi()
+      ..liveProducts = [
+        Product.fromJson({
+          'id': 101,
+          'name': 'Barrier Cream',
+          'base_price': '18.00',
+          'available_qty': 2,
+        }),
+      ];
+    final appState = AppState(api: fakeApi);
+    await appState.refreshStorefrontData();
+    const variant = ProductVariant(
+      id: 'variant-30ml',
+      name: '30ml',
+      displayName: '30ml',
+      price: 19.0,
+      stockQuantity: 2,
+    );
+
+    expect(appState.addToCart(_stockedProduct, variant: variant), isTrue);
+    await appState.refreshStorefrontData();
+
+    expect(appState.cart, hasLength(1));
+    expect(appState.cart.single.variant?.id, 'variant-30ml');
+  });
+
+  test('variant cart line is dropped when list variants omit it', () async {
+    final fakeApi = FakeStorefrontApi()
+      ..liveProducts = [
+        Product.fromJson({
+          'id': 101,
+          'name': 'Barrier Cream',
+          'base_price': '18.00',
+          'available_qty': 2,
+          'variants': [
+            {'id': 'variant-50ml', 'name': '50ml', 'available_qty': 2},
+          ],
+        }),
+      ];
+    final appState = AppState(api: fakeApi);
+    await appState.refreshStorefrontData();
+    const variant = ProductVariant(
+      id: 'variant-30ml',
+      name: '30ml',
+      displayName: '30ml',
+      stockQuantity: 2,
+    );
+
+    expect(appState.addToCart(_stockedProduct, variant: variant), isTrue);
+    await appState.refreshStorefrontData();
+
+    expect(appState.cart, isEmpty);
+  });
+
+  test('expired customer token signs out with a session notice', () async {
+    final fakeApi = FakeStorefrontApi();
+    final appState = await signedInState(fakeApi);
+    expect(appState.isCustomerSignedIn, isTrue);
+
+    fakeApi.listOrdersError = const StorefrontApiException(
+      'Invalid or expired customer token',
+      statusCode: 401,
+    );
+    await appState.loadCustomerData();
+
+    expect(appState.isCustomerSignedIn, isFalse);
+    expect(appState.sessionNotice, sessionExpiredNotice);
+    expect(appState.orders, isEmpty);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('skin-cella_customer_token'), isNull);
+
+    appState.clearSessionNotice();
+    expect(appState.sessionNotice, isNull);
+  });
+
+  test('sign out clears orders, cart and persisted cart', () async {
+    final fakeApi = FakeStorefrontApi();
+    final appState = await signedInState(fakeApi);
+    expect(appState.orders, isNotEmpty);
+    expect(appState.addToCart(_stockedProduct), isTrue);
+
+    await appState.signOutCustomer();
+
+    expect(appState.orders, isEmpty);
+    expect(appState.notifications, isEmpty);
+    expect(appState.cart, isEmpty);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('skin-cella_customer_cart'), isNull);
+  });
+
+  test('change password and delete account send the password fields', () async {
+    final fakeApi = FakeStorefrontApi();
+    final appState = await signedInState(fakeApi);
+
+    await appState.changePassword(
+      currentPassword: 'old-password',
+      newPassword: 'new-password-123',
+    );
+    expect(fakeApi.lastChangePasswordCurrent, 'old-password');
+    expect(fakeApi.lastChangePasswordNew, 'new-password-123');
+    expect(appState.isCustomerSignedIn, isTrue);
+
+    await appState.deleteAccount(password: 'new-password-123');
+    expect(fakeApi.lastDeleteAccountPassword, 'new-password-123');
+    expect(appState.isCustomerSignedIn, isFalse);
+  });
+
+  test('profile update sends only the name', () async {
+    final fakeApi = FakeStorefrontApi();
+    final appState = await signedInState(fakeApi);
+
+    await appState.updateProfileData(name: 'Maya Updated');
+
+    expect(fakeApi.lastUpdatedProfileName, 'Maya Updated');
+    expect(fakeApi.lastUpdatedProfilePhone, isNull);
+    expect(appState.profileName, 'Maya Updated');
+  });
+
+  test('mark all notifications read uses one request', () async {
+    final fakeApi = FakeStorefrontApi();
+    final appState = await signedInState(fakeApi);
+    expect(appState.notifications.single['isRead'], isFalse);
+
+    await appState.markAllNotificationsRead();
+
+    expect(fakeApi.markAllReadCalled, isTrue);
+    expect(appState.notifications.single['isRead'], isTrue);
+  });
+
+  test('cart totals use the server quote when present', () async {
+    final fakeApi = FakeStorefrontApi()
+      ..quoteResponse = {
+        'subtotal': 36.0,
+        'discount_amount': 6.0,
+        'tax_amount': 0.0,
+        'delivery_fee': 0.0,
+        'total': 30.0,
+        'applied_promotions': [
+          {'title': 'Spring Sale'}
+        ],
+      };
+    final appState = AppState(api: fakeApi);
+    await appState.refreshStorefrontData();
+    appState.setFulfillmentType('pickup');
+
+    expect(appState.addToCart(_stockedProduct, quantity: 2), isTrue);
+    expect(appState.cartQuote, isNull);
+    await appState.refreshCartQuote();
+
+    expect(appState.cartDiscount, 6.0);
+    expect(appState.cartTotalFor('Pickup'), 30.0);
+    expect(appState.cartQuote?.appliedLabels, ['Spring Sale']);
+  });
+
+  test('deleting the last address leaves no placeholder', () async {
+    final fakeApi = FakeStorefrontApi();
+    final appState = await signedInState(fakeApi);
+
+    await appState.deleteCustomerAddress(appState.customerAddresses.single);
+
+    expect(appState.customerAddresses, isEmpty);
+    expect(appState.savedAddresses, isEmpty);
+  });
+
+  test('preorder line quantity is capped by the preorder max', () async {
+    final appState = AppState(api: FakeStorefrontApi());
+    const preorder = Product(
+      id: '301',
+      name: 'Coming Soon Serum',
+      description: '',
+      shortDescription: '',
+      price: 20.0,
+      imageUrl: '',
+      category: 'Serums',
+      stockQuantity: 0,
+      skinTypes: ['All'],
+      ingredients: '',
+      brand: 'Skin Cella',
+      availabilityMode: 'preorder',
+      preorderMaxQuantity: 3,
+    );
+
+    expect(appState.addToCart(preorder), isTrue);
+    expect(appState.maxCartQuantityFor(appState.cart.single), 3);
+    expect(appState.updateCartItemQuantity(appState.cart.single, 3), isTrue);
+    expect(appState.updateCartItemQuantity(appState.cart.single, 4), isFalse);
+    // Regular items can't join a pre-order bag through updateQuantity either.
+    expect(appState.updateQuantity(_stockedProduct, 1), isFalse);
   });
 }

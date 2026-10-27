@@ -40,6 +40,7 @@ class _LiveSupportScreenState extends State<LiveSupportScreen> {
   }
 
   void _showCreateTicketBottomSheet(BuildContext context, AppState state) {
+    var isSubmitting = false;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -204,7 +205,9 @@ class _LiveSupportScreenState extends State<LiveSupportScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => Navigator.pop(sheetContext),
+                            onPressed: isSubmitting
+                                ? null
+                                : () => Navigator.pop(sheetContext),
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(
                                   color: AppTheme.primary, width: 1.0),
@@ -227,25 +230,48 @@ class _LiveSupportScreenState extends State<LiveSupportScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
-                              final title = _ticketTitleController.text.trim();
-                              final desc = _ticketDescController.text.trim();
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    final title =
+                                        _ticketTitleController.text.trim();
+                                    final desc =
+                                        _ticketDescController.text.trim();
 
-                              if (title.isEmpty || desc.isEmpty) {
-                                showTopToast(
-                                    context, 'Please fill out all fields.');
-                                return;
-                              }
+                                    if (title.isEmpty || desc.isEmpty) {
+                                      showTopToast(sheetContext,
+                                          'Please fill out all fields.');
+                                      return;
+                                    }
 
-                              state.createTicket(
-                                  title, _selectedTicketCategory, desc);
-                              _ticketTitleController.clear();
-                              _ticketDescController.clear();
-                              Navigator.pop(sheetContext);
-
-                              showTopToast(context,
-                                  'Consultation ticket created successfully!');
-                            },
+                                    setSheetState(() => isSubmitting = true);
+                                    try {
+                                      await state.createTicket(
+                                          title, _selectedTicketCategory, desc);
+                                    } catch (e) {
+                                      // Keep the form filled so the
+                                      // customer's message is not lost.
+                                      if (sheetContext.mounted) {
+                                        setSheetState(
+                                            () => isSubmitting = false);
+                                        showTopToast(
+                                          sheetContext,
+                                          userFacingError(e,
+                                              fallback:
+                                                  'Unable to create your consultation. Please try again.'),
+                                        );
+                                      }
+                                      return;
+                                    }
+                                    if (!mounted || !context.mounted) return;
+                                    _ticketTitleController.clear();
+                                    _ticketDescController.clear();
+                                    if (sheetContext.mounted) {
+                                      Navigator.pop(sheetContext);
+                                    }
+                                    showTopToast(context,
+                                        'Consultation ticket created successfully!');
+                                  },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.primary,
                               foregroundColor: Colors.white,
@@ -255,14 +281,23 @@ class _LiveSupportScreenState extends State<LiveSupportScreen> {
                               ),
                               elevation: 0,
                             ),
-                            child: Text(
-                              'SUBMIT',
-                              style: GoogleFonts.manrope(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    'SUBMIT',
+                                    style: GoogleFonts.manrope(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
                           ),
                         ),
                       ],

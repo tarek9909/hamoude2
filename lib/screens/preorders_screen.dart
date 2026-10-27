@@ -34,7 +34,21 @@ class PreordersScreen extends StatelessWidget {
       body: RefreshIndicator(
         color: AppTheme.primary,
         onRefresh: appState.refreshAllData,
-        child: products.isEmpty
+        child: products.isEmpty && appState.isCatalogLoading
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(32),
+                children: [
+                  const SizedBox(height: 160),
+                  Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ],
+              )
+            : products.isEmpty
             ? ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(32),

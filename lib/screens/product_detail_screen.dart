@@ -244,6 +244,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return images;
   }
 
+  void _openImageGallery(Product product, List<ProductImage> images) {
+    if (images.isEmpty) return;
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _FullScreenProductGallery(
+          productId: product.id,
+          images: images,
+          initialIndex: _selectedImageIndex.clamp(0, images.length - 1),
+        ),
+      ),
+    );
+  }
+
   void _focusVariantImage(Product product, ProductVariant? variant) {
     if (variant == null || variant.imageUrl.isEmpty) return;
     final images = _galleryImages(product, variant);
@@ -865,7 +879,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         : null;
     final galleryImages = _galleryImages(product, selectedVariant);
     final promoInfo = appState.getPromotionForProduct(product);
-    final discountedPrice = promoInfo?['discountedPrice'] as double?;
+    final promoPrice = (promoInfo?['discountedPrice'] as num?)?.toDouble();
+    // Only show a discount when the promotion really lowers the price.
+    final discountedPrice =
+        promoPrice != null && promoPrice < product.price ? promoPrice : null;
     final discountLabel = promoInfo?['discountLabel'] as String?;
     final displayPrice = _priceForSelection(
       product: product,
@@ -943,21 +960,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               },
                               itemBuilder: (context, index) {
                                 final image = galleryImages[index];
-                                return ShimmerImage(
-                                  imageUrl: image.imageUrl,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  errorWidget: Container(
-                                    color:
-                                        AppTheme.border.withValues(alpha: 0.35),
-                                    child: Icon(Icons.spa_outlined,
-                                        size: 48, color: AppTheme.secondary),
+                                return GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () =>
+                                      _openImageGallery(product, galleryImages),
+                                  child: ShimmerImage(
+                                    imageUrl: image.imageUrl,
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    errorWidget: Container(
+                                      color: AppTheme.border
+                                          .withValues(alpha: 0.35),
+                                      child: Icon(Icons.spa_outlined,
+                                          size: 48, color: AppTheme.secondary),
+                                    ),
                                   ),
                                 );
                               },
                             ),
                     ),
+                    if (galleryImages.isNotEmpty)
+                      Positioned(
+                        right: 18,
+                        bottom: 12,
+                        child: Material(
+                          color: Colors.black.withValues(alpha: 0.38),
+                          shape: const CircleBorder(),
+                          child: IconButton(
+                            tooltip: 'View full screen',
+                            onPressed: () =>
+                                _openImageGallery(product, galleryImages),
+                            icon: const Icon(
+                              Icons.zoom_out_map,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                          ),
+                        ),
+                      ),
                     if (galleryImages.length > 1)
                       Positioned(
                         bottom: 18,
@@ -1141,32 +1182,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    // Rating details
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded,
-                            color: Color(0xFFE5B556), size: 18),
-                        const SizedBox(width: 4),
-                        Text(
-                          product.rating.toString(),
-                          style: GoogleFonts.manrope(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                        if (appState.reviewsEnabled) ...[
-                          const SizedBox(width: 6),
+                    // Rating details (hidden until the product has reviews)
+                    if (product.reviewsCount > 0)
+                      Row(
+                        children: [
+                          const Icon(Icons.star_rounded,
+                              color: Color(0xFFE5B556), size: 18),
+                          const SizedBox(width: 4),
                           Text(
-                            '(${_productReviews.isNotEmpty ? _productReviews.length : product.reviewsCount} reviews)',
+                            product.rating.toStringAsFixed(1),
                             style: GoogleFonts.manrope(
-                              fontSize: 12,
-                              color: AppTheme.secondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
                             ),
                           ),
+                          if (appState.reviewsEnabled) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '(${_productReviews.isNotEmpty ? _productReviews.length : product.reviewsCount} reviews)',
+                              style: GoogleFonts.manrope(
+                                fontSize: 12,
+                                color: AppTheme.secondary,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
                     const SizedBox(height: 20),
                     // Price tag
                     Row(
@@ -1670,21 +1712,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 child: canAddSelected
                     ? ElevatedButton(
                         onPressed: () {
-                          final added = appState.addToCart(
+                          final blockReason = appState.cartAddBlockReason(
                             product,
-                            quantity: _quantity,
-                            variant: selectedVariant,
+                            _quantity,
+                            selectedVariant,
                           );
+                          if (blockReason == null) {
+                            appState.addToCart(
+                              product,
+                              quantity: _quantity,
+                              variant: selectedVariant,
+                            );
+                          }
                           final itemName = selectedVariant == null
                               ? product.name
                               : '${product.name} - ${selectedVariant.displayName}';
                           showTopToast(
                             context,
-                            added
-                                ? '$_quantity x $itemName added to bag'
-                                : product.isPreorder
-                                    ? 'Pre-order items must be checked out separately.'
-                                    : 'Only $selectedStock items in stock.',
+                            blockReason ??
+                                '$_quantity x $itemName added to bag',
                           );
                         },
                         child: Text(
@@ -1723,5 +1769,208 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final date = DateTime.tryParse(dateStr);
     if (date == null) return '';
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+}
+
+class _FullScreenProductGallery extends StatefulWidget {
+  final String productId;
+  final List<ProductImage> images;
+  final int initialIndex;
+
+  const _FullScreenProductGallery({
+    required this.productId,
+    required this.images,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenProductGallery> createState() =>
+      _FullScreenProductGalleryState();
+}
+
+class _FullScreenProductGalleryState extends State<_FullScreenProductGallery> {
+  late final PageController _controller;
+  late int _currentIndex;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gallery = PageView.builder(
+      controller: _controller,
+      // Lock swiping while zoomed so panning moves the image, not the page.
+      physics: _isZoomed
+          ? const NeverScrollableScrollPhysics()
+          : const PageScrollPhysics(),
+      itemCount: widget.images.length,
+      onPageChanged: (index) => setState(() => _currentIndex = index),
+      itemBuilder: (context, index) => _ZoomableGalleryImage(
+        imageUrl: widget.images[index].imageUrl,
+        onZoomChanged: (zoomed) {
+          if (zoomed != _isZoomed) setState(() => _isZoomed = zoomed);
+        },
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Hero(tag: 'product_img_${widget.productId}', child: gallery),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            right: 14,
+            child: Material(
+              color: Colors.black.withValues(alpha: 0.48),
+              shape: const CircleBorder(),
+              child: IconButton(
+                tooltip: 'Close full-screen image',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+          ),
+          if (widget.images.length > 1)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.paddingOf(context).bottom + 22,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(widget.images.length, (index) {
+                  final selected = index == _currentIndex;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: selected ? 20 : 7,
+                    height: 7,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: selected ? Colors.white : Colors.white54,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  );
+                }),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ZoomableGalleryImage extends StatefulWidget {
+  final String imageUrl;
+  final ValueChanged<bool> onZoomChanged;
+
+  const _ZoomableGalleryImage({
+    required this.imageUrl,
+    required this.onZoomChanged,
+  });
+
+  @override
+  State<_ZoomableGalleryImage> createState() => _ZoomableGalleryImageState();
+}
+
+class _ZoomableGalleryImageState extends State<_ZoomableGalleryImage>
+    with SingleTickerProviderStateMixin {
+  static const double _doubleTapScale = 2.5;
+
+  final _transformController = TransformationController();
+  late final AnimationController _animController;
+  Animation<Matrix4>? _animation;
+  TapDownDetails? _doubleTapDetails;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    )..addListener(() {
+        if (_animation != null) {
+          _transformController.value = _animation!.value;
+        }
+      });
+    _transformController.addListener(_reportZoom);
+  }
+
+  @override
+  void dispose() {
+    _transformController.removeListener(_reportZoom);
+    _transformController.dispose();
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _reportZoom() {
+    final scale = _transformController.value.getMaxScaleOnAxis();
+    widget.onZoomChanged(scale > 1.01);
+  }
+
+  void _handleDoubleTap() {
+    final current = _transformController.value;
+    final Matrix4 target;
+    if (current.getMaxScaleOnAxis() > 1.01) {
+      target = Matrix4.identity();
+    } else {
+      final position = _doubleTapDetails?.localPosition ?? Offset.zero;
+      target = Matrix4.identity()
+        ..translateByDouble(
+          -position.dx * (_doubleTapScale - 1),
+          -position.dy * (_doubleTapScale - 1),
+          0,
+          1,
+        )
+        ..scaleByDouble(_doubleTapScale, _doubleTapScale, 1, 1);
+    }
+    _animation = Matrix4Tween(begin: current, end: target).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    );
+    _animController.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onDoubleTapDown: (details) => _doubleTapDetails = details,
+      onDoubleTap: _handleDoubleTap,
+      child: InteractiveViewer(
+        transformationController: _transformController,
+        minScale: 1,
+        maxScale: 5,
+        child: SizedBox.expand(
+          child: Image.network(
+            widget.imageUrl,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, progress) {
+              if (progress == null) return child;
+              return const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) => const Center(
+              child: Icon(
+                Icons.broken_image_outlined,
+                color: Colors.white70,
+                size: 52,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

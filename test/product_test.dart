@@ -98,4 +98,45 @@ void main() {
     expect(product.variants.single.imageUrl, 'https://example.test/rose.jpg');
     expect(product.variants.single.attributeValue('size'), '30ml');
   });
+
+  test('reads backend rating fields and never invents ratings or volume', () {
+    final rated = Product.fromJson({
+      'id': 46,
+      'name': 'Rated Serum',
+      'base_price': '10',
+      'rating_average': '4.25',
+      'rating_count': 8,
+    });
+    expect(rated.rating, 4.25);
+    expect(rated.reviewsCount, 8);
+
+    final plain = Product.fromJson({'id': 47, 'name': 'Plain', 'price': 5});
+    expect(plain.rating, 0);
+    expect(plain.reviewsCount, 0);
+    expect(plain.volume, '');
+    expect(plain.hasVariantData, isFalse);
+  });
+
+  test('list payload variants array marks variant data as loaded', () {
+    final product = Product.fromJson({
+      'id': 48,
+      'name': 'Listed',
+      'price': 5,
+      'variants': [
+        {'id': 1, 'name': 'Small', 'available_qty': 2, 'is_active': 1},
+        {'id': 2, 'name': 'Hidden', 'available_qty': 2, 'is_active': 0},
+      ],
+    });
+    expect(product.hasVariantData, isTrue);
+    expect(product.variants.map((v) => v.id), ['1']);
+
+    final none = Product.fromJson({
+      'id': 49,
+      'name': 'No variants',
+      'price': 5,
+      'variants': [],
+    });
+    expect(none.hasVariantData, isTrue);
+    expect(none.variants, isEmpty);
+  });
 }

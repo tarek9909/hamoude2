@@ -108,10 +108,9 @@ class BundlesScreen extends StatelessWidget {
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
                               final bundle = appState.bundles[index];
-                              final imageUrl =
+                              final imageUrl = appState.api.resolveMediaUrl(
                                   bundle['image_url']?.toString() ??
-                                      bundle['media_url']?.toString() ??
-                                      "";
+                                      bundle['media_url']?.toString());
 
                               final tag = bundle['subtitle']?.toString() ??
                                   bundle['tag']?.toString() ??

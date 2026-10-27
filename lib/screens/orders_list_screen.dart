@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/app_theme.dart';
+import 'login_screen.dart';
 import 'track_order_screen.dart';
 
 class TrackOrdersListScreen extends StatefulWidget {
@@ -154,7 +155,7 @@ class _TrackOrdersListScreenState extends State<TrackOrdersListScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Please access the Me profile tab to sign in or register and sync your active s, order histories, and support tickets.',
+                              'Sign in or create an account to see your active orders, order history and support tickets.',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.manrope(
                                 fontSize: 12,
@@ -165,8 +166,16 @@ class _TrackOrdersListScreenState extends State<TrackOrdersListScreen> {
                             const SizedBox(height: 20),
                             ElevatedButton(
                               onPressed: () {
-                                // Switch to Profile Tab
-                                appState.setTabIndex(4);
+                                if (appState.isTabEnabled(4)) {
+                                  // Switch to Profile Tab
+                                  appState.setTabIndex(4);
+                                } else {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const LoginScreen(),
+                                    ),
+                                  );
+                                }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.primary,
@@ -178,7 +187,7 @@ class _TrackOrdersListScreenState extends State<TrackOrdersListScreen> {
                                     horizontal: 24, vertical: 12),
                               ),
                               child: Text(
-                                'GO TO PROFILE',
+                                'SIGN IN',
                                 style: GoogleFonts.manrope(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,

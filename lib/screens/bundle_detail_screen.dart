@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../providers/app_state.dart';
+import '../services/storefront_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_refresh.dart';
 import '../widgets/top_toast.dart';
@@ -18,10 +19,39 @@ String _formatAmount(double value) {
   return value.toStringAsFixed(value % 1 == 0 ? 0 : 2);
 }
 
-class BundleDetailScreen extends StatelessWidget {
+class BundleDetailScreen extends StatefulWidget {
   final Map<String, dynamic> bundle;
 
   const BundleDetailScreen({super.key, required this.bundle});
+
+  @override
+  State<BundleDetailScreen> createState() => _BundleDetailScreenState();
+}
+
+class _BundleDetailScreenState extends State<BundleDetailScreen> {
+  bool _isAdding = false;
+
+  Map<String, dynamic> get bundle => widget.bundle;
+
+  Future<void> _addBundleToBag(AppState appState, String title) async {
+    if (_isAdding) return;
+    setState(() => _isAdding = true);
+    try {
+      await appState.addBundleToCart(bundle);
+      if (!mounted) return;
+      showTopToast(context, '$title added to bag.');
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is StorefrontApiException
+          ? e.message
+          : e is StateError
+              ? e.message
+              : e.toString().replaceAll('Exception: ', '');
+      showTopToast(context, message);
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,9 +69,8 @@ class BundleDetailScreen extends StatelessWidget {
         bundle['summary']?.toString() ??
         "";
 
-    final imageUrl = bundle['image_url']?.toString() ??
-        bundle['media_url']?.toString() ??
-        "";
+    final imageUrl = appState.api.resolveMediaUrl(
+        bundle['image_url']?.toString() ?? bundle['media_url']?.toString());
 
     // Extract list of items
     final rawItems = bundle['items'] as List? ?? [];
@@ -337,7 +366,9 @@ class BundleDetailScreen extends StatelessWidget {
                           "Product";
                       final variantName =
                           item['variant_name']?.toString() ?? "";
-                      final productImgUrl = matchedProduct?.imageUrl ?? "";
+                      final productImgUrl = appState.api.resolveMediaUrl(
+                          matchedProduct?.imageUrl ??
+                              item['image_url']?.toString());
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -465,38 +496,10 @@ class BundleDetailScreen extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: itemsList.isEmpty || effectiveBundlePrice == null
-                  ? null
-                  : () {
-                      // Create a single Product representing the whole bundle
-                      final bundleId =
-                          'bundle_${bundle['id']?.toString() ?? title.hashCode.toString()}';
-                      final bundleProduct = Product(
-                        id: bundleId,
-                        name: title,
-                        description: description,
-                        shortDescription: '${itemsList.length} items bundle',
-                        price: effectiveBundlePrice,
-                        imageUrl: imageUrl,
-                        category: 'Bundle',
-                        stockQuantity: 99,
-                        rating: 5.0,
-                        reviewsCount: 0,
-                        skinTypes: const ['All Skintypes'],
-                        ingredients: '',
-                        volume: '',
-                        brand: tag,
-                      );
-
-                      final added = appState.addToCart(bundleProduct);
-
-                      showTopToast(
-                        context,
-                        added
-                            ? '$title added to bag.'
-                            : 'Only ${bundleProduct.stockQuantity} items in stock.',
-                      );
-                    },
+              onPressed:
+                  itemsList.isEmpty || effectiveBundlePrice == null || _isAdding
+                      ? null
+                      : () => _addBundleToBag(appState, title),
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.primary,
                 foregroundColor: colors.onPrimary,
@@ -505,15 +508,24 @@ class BundleDetailScreen extends StatelessWidget {
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              child: Text(
-                price != null
-                    ? 'ADD BUNDLE TO BAG - \$$price'
-                    : 'ADD BUNDLE TO BAG',
-                style: GoogleFonts.manrope(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
-              ),
+              child: _isAdding
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colors.onPrimary,
+                      ),
+                    )
+                  : Text(
+                      price != null
+                          ? 'ADD BUNDLE TO BAG - \$$price'
+                          : 'ADD BUNDLE TO BAG',
+                      style: GoogleFonts.manrope(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
             ),
           ),
         ),

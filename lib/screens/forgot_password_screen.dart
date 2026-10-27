@@ -21,6 +21,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   late final TextEditingController _identifierController;
   bool _isLoading = false;
   bool _submitted = false;
+  String? _resultMessage;
 
   @override
   void initState() {
@@ -38,23 +39,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _submitRequest() async {
     final identifier = _identifierController.text.trim();
     if (identifier.isEmpty) {
-      showTopToast(context, 'Please enter your phone or account identifier.');
+      showTopToast(context, 'Please enter your username.');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      await context.read<AppState>().requestPasswordReset(identifier);
+      final message =
+          await context.read<AppState>().requestPasswordReset(identifier);
       if (!mounted) return;
-      setState(() => _submitted = true);
-      showTopToast(
-        context,
-        'Request received. An administrator will review it.',
-      );
+      final shown = message.trim().isNotEmpty
+          ? message.trim()
+          : 'Your reset request was sent. The store will contact you.';
+      setState(() {
+        _submitted = true;
+        _resultMessage = shown;
+      });
+      showTopToast(context, shown);
     } catch (e) {
       if (mounted) {
-        showTopToast(context, e.toString().replaceAll('Exception: ', ''));
+        showTopToast(
+            context,
+            userFacingError(e,
+                fallback:
+                    'Unable to send your reset request. Please try again.'));
       }
     } finally {
       if (mounted) {
@@ -66,7 +75,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget _buildIdentifierField() {
     return TextField(
       controller: _identifierController,
-      keyboardType: TextInputType.phone,
+      keyboardType: TextInputType.text,
+      autocorrect: false,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) {
+        if (!_isLoading && !_submitted) _submitRequest();
+      },
       enabled: !_isLoading && !_submitted,
       cursorColor: AppTheme.primary,
       style: GoogleFonts.manrope(
@@ -75,10 +89,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
-        labelText: 'PHONE OR ACCOUNT ID',
-        hintText: 'Enter your registered phone number',
+        labelText: 'USERNAME',
+        hintText: 'Enter your username',
         prefixIcon: Icon(
-          Icons.badge_outlined,
+          Icons.alternate_email,
           size: 18,
           color: AppTheme.primary.withValues(alpha: 0.7),
         ),
@@ -243,8 +257,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         const SizedBox(height: 10),
                         Text(
                           _submitted
-                              ? 'A store administrator will review your request and contact you through the approved store channel.'
-                              : 'Send a reset request for admin approval. This keeps account access changes reviewed by the store team.',
+                              ? (_resultMessage ??
+                                  'Your reset request was sent. The store will contact you.')
+                              : 'Enter your username and we will send a reset request to the store team. They will contact you to help you set a new password.',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.manrope(
                             fontSize: 12.5,
@@ -312,7 +327,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                           : Text(
                                               _submitted
                                                   ? 'BACK TO SIGN IN'
-                                                  : 'REQUEST REVIEW',
+                                                  : 'SEND RESET REQUEST',
                                               style: GoogleFonts.manrope(
                                                 fontWeight: FontWeight.bold,
                                                 letterSpacing: 1.2,

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,16 @@ import 'track_order_screen.dart';
 import '../widgets/top_toast.dart';
 import 'policies_webview_screen.dart';
 
+/// Disposes controllers used by a dialog or sheet once its exit
+/// animation has finished (the route future completes before that).
+void _disposeAfterRouteClosed(List<TextEditingController> controllers) {
+  Future<void>.delayed(const Duration(milliseconds: 500), () {
+    for (final controller in controllers) {
+      controller.dispose();
+    }
+  });
+}
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -38,6 +49,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
     if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: AppTheme.primary.withValues(alpha: 0.1),
+          alignment: Alignment.center,
+          child: Icon(Icons.person_outline,
+              color: AppTheme.primary, size: iconSize),
+        ),
+      );
+    }
+    if (kIsWeb) {
       return Image.network(
         path,
         fit: BoxFit.cover,
@@ -368,14 +391,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () {
                     final url = appState.api
                         .getLegalPolicyUrl('privacy-policy-and-terms-of-use');
-                    Navigator.push(
+                    PoliciesWebViewScreen.open(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => PoliciesWebViewScreen(
-                          url: url,
-                          title: 'Terms & Policies',
-                        ),
-                      ),
+                      url: url,
+                      title: 'Terms & Policies',
                     );
                   },
                 ),
@@ -762,13 +781,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       context, 'Store review submitted!');
                                   setState(() {});
                                 } catch (e) {
-                                  setSheetState(() => isSubmitting = false);
                                   if (ctx.mounted) {
+                                    setSheetState(() => isSubmitting = false);
                                     showTopToast(
                                       ctx,
-                                      e
-                                          .toString()
-                                          .replaceAll('Exception: ', ''),
+                                      userFacingError(e,
+                                          fallback:
+                                              'Unable to submit your review.'),
                                     );
                                   }
                                 }
@@ -808,6 +827,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+    _disposeAfterRouteClosed([bodyController]);
   }
 
   Widget _buildLiveOrdersHorizontal(AppState appState) {
@@ -1117,71 +1137,149 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _showDeleteAccountDialog(
       BuildContext context, AppState appState) async {
-    final confirmed = await showDialog<bool>(
+    final passwordController = TextEditingController();
+    bool isDeleting = false;
+    String? errorMessage;
+
+    final deleted = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.background,
-        title: Text(
-          'Delete Account',
-          style: GoogleFonts.ebGaramond(
-            fontWeight: FontWeight.bold,
-            color: AppTheme.primary,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to permanently delete your account? This action cannot be undone and you will lose all order history.',
-          style: GoogleFonts.manrope(
-            fontSize: 14,
-            color: AppTheme.secondary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'CANCEL',
-              style: GoogleFonts.manrope(
-                fontSize: 12,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          Future<void> submit() async {
+            final password = passwordController.text;
+            if (password.isEmpty) {
+              setDialogState(() {
+                errorMessage = 'Enter your password to confirm.';
+              });
+              return;
+            }
+            setDialogState(() {
+              isDeleting = true;
+              errorMessage = null;
+            });
+            try {
+              await appState.deleteAccount(password: password);
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext, true);
+              }
+            } catch (e) {
+              if (!dialogContext.mounted) return;
+              setDialogState(() {
+                isDeleting = false;
+                errorMessage = userFacingError(e,
+                    fallback:
+                        'Unable to delete your account. Please try again.');
+              });
+            }
+          }
+
+          return AlertDialog(
+            backgroundColor: AppTheme.background,
+            title: Text(
+              'Delete Account',
+              style: GoogleFonts.ebGaramond(
                 fontWeight: FontWeight.bold,
-                color: AppTheme.secondary,
+                color: AppTheme.primary,
               ),
             ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'DELETE',
-              style: GoogleFonts.manrope(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFFBA1A1A),
-              ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Are you sure you want to permanently delete your account? This action cannot be undone and you will lose all order history.',
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    color: AppTheme.secondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  enabled: !isDeleting,
+                  autofocus: true,
+                  onSubmitted: (_) {
+                    if (!isDeleting) submit();
+                  },
+                  style: GoogleFonts.manrope(
+                    fontSize: 14,
+                    color: AppTheme.primary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    hintText: 'Enter your password to confirm',
+                    prefixIcon: Icon(Icons.lock_outline,
+                        size: 18, color: AppTheme.secondary),
+                  ),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    style: GoogleFonts.manrope(
+                      fontSize: 12,
+                      color: const Color(0xFFBA1A1A),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: isDeleting
+                    ? null
+                    : () => Navigator.pop(dialogContext, false),
+                child: Text(
+                  'CANCEL',
+                  style: GoogleFonts.manrope(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.secondary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: isDeleting ? null : submit,
+                child: isDeleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFBA1A1A),
+                        ),
+                      )
+                    : Text(
+                        'DELETE',
+                        style: GoogleFonts.manrope(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFFBA1A1A),
+                        ),
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
+    _disposeAfterRouteClosed([passwordController]);
 
-    if (confirmed == true) {
-      try {
-        await appState.deleteCustomerAccount();
-        if (context.mounted) {
-          showTopToast(context, 'Account deleted successfully.');
-        }
-      } catch (e) {
-        if (context.mounted) {
-          showTopToast(context, 'Failed to delete account: $e');
-        }
-      }
+    if (deleted == true && context.mounted) {
+      showTopToast(context, 'Account deleted successfully.');
     }
   }
 
-  void _showWholesalePasswordDialog(BuildContext context, AppState appState) {
+  Future<void> _showWholesalePasswordDialog(
+      BuildContext context, AppState appState) async {
     final passwordController = TextEditingController();
     bool isLoading = false;
     String? errorMessage;
 
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
@@ -1321,12 +1419,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   context, 'Wholesale access granted.');
                             }
                           } catch (e) {
+                            if (!dialogContext.mounted) return;
                             setState(() {
                               isLoading = false;
-                              errorMessage = e
-                                  .toString()
-                                  .replaceAll('Exception:', '')
-                                  .trim();
+                              errorMessage = userFacingError(e,
+                                  fallback:
+                                      'Unable to verify the passcode. Please try again.');
                             });
                           }
                         },
@@ -1355,6 +1453,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+    _disposeAfterRouteClosed([passwordController]);
   }
 
   void _showExitWholesaleDialog(BuildContext context, AppState appState) {
@@ -1439,10 +1538,14 @@ class TicketThreadScreen extends StatefulWidget {
   State<TicketThreadScreen> createState() => _TicketThreadScreenState();
 }
 
-class _TicketThreadScreenState extends State<TicketThreadScreen> {
+class _TicketThreadScreenState extends State<TicketThreadScreen>
+    with WidgetsBindingObserver {
+  static const _pollInterval = Duration(seconds: 20);
+
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _pollingTimer;
+  bool _isPolling = false;
   final List<Map<String, dynamic>> _pickedAttachments = [];
   bool _isUploadingAttachment = false;
 
@@ -1460,8 +1563,8 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
 
     try {
       final appState = Provider.of<AppState>(context, listen: false);
-      final response = await appState.uploadSupportAttachment(
-          pickedFile.path, pickedFile.name);
+      final response =
+          await appState.uploadSupportAttachment(pickedFile, pickedFile.name);
 
       if (!mounted) return;
       if (response.isNotEmpty) {
@@ -1477,7 +1580,10 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showTopToast(context, 'Failed to upload attachment: $e');
+        showTopToast(
+          context,
+          userFacingError(e, fallback: 'Unable to upload the attachment.'),
+        );
       }
     } finally {
       if (mounted) {
@@ -1491,6 +1597,7 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startPolling();
     // Initial fetch to populate thread messages and scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -1502,63 +1609,85 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _pollOnce();
+    } else {
+      _stopPolling();
+    }
+  }
+
   void _startPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(_pollInterval, (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      try {
-        final appState = Provider.of<AppState>(context, listen: false);
-        final ticketId = widget.ticket.id;
-        final currentMessagesCount = appState.tickets
-            .firstWhere((t) => t.id == ticketId, orElse: () => widget.ticket)
-            .messages
-            .length;
+      _pollOnce();
+    });
+  }
 
-        await appState.refreshTicketDetails(ticketId);
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
 
-        if (mounted) {
-          final ticket = appState.tickets
-              .firstWhere((t) => t.id == ticketId, orElse: () => widget.ticket);
-          final newMessagesCount = ticket.messages.length;
-          if (newMessagesCount > currentMessagesCount) {
-            final newMessages = ticket.messages.sublist(currentMessagesCount);
-            for (final msg in newMessages) {
-              if (msg.sender.toLowerCase() != 'customer' &&
-                  msg.sender.toLowerCase() != 'user') {
-                showTopToast(
-                  context,
-                  'Advisor: ${msg.content}',
-                  actionLabel: 'VIEW',
-                  onActionPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TicketThreadScreen(ticket: ticket),
-                      ),
-                    );
-                  },
-                );
-                appState.addLocalNotification(
-                  title: 'Support Reply: ${ticket.title}',
-                  message: msg.content,
-                  actionType: 'support_reply',
-                  actionValue: ticket.id,
-                );
-              }
+  Future<void> _pollOnce() async {
+    // Skip this tick while the previous request is still in flight.
+    if (!mounted || _isPolling) return;
+    _isPolling = true;
+    try {
+      final appState = Provider.of<AppState>(context, listen: false);
+      final ticketId = widget.ticket.id;
+      final currentMessagesCount = appState.tickets
+          .firstWhere((t) => t.id == ticketId, orElse: () => widget.ticket)
+          .messages
+          .length;
+
+      await appState.refreshTicketDetails(ticketId);
+
+      if (mounted) {
+        final ticket = appState.tickets
+            .firstWhere((t) => t.id == ticketId, orElse: () => widget.ticket);
+        final newMessagesCount = ticket.messages.length;
+        if (newMessagesCount > currentMessagesCount) {
+          final newMessages = ticket.messages.sublist(currentMessagesCount);
+          for (final msg in newMessages) {
+            if (msg.sender.toLowerCase() != 'customer' &&
+                msg.sender.toLowerCase() != 'user') {
+              showTopToast(
+                context,
+                'Advisor: ${msg.content}',
+                actionLabel: 'VIEW',
+                // This thread is already open: just reveal the new reply
+                // instead of pushing a duplicate thread screen.
+                onActionPressed: _scrollToBottom,
+              );
+              appState.addLocalNotification(
+                title: 'Support Reply: ${ticket.title}',
+                message: msg.content,
+                actionType: 'support_reply',
+                actionValue: ticket.id,
+              );
             }
           }
+          _scrollToBottom();
         }
-      } catch (_) {
-        // Widget may have been disposed during the async gap; swallow the error.
       }
-    });
+    } catch (_) {
+      // Widget may have been disposed during the async gap; swallow the error.
+    } finally {
+      _isPolling = false;
+    }
   }
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -1620,7 +1749,12 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    showTopToast(context, 'Failed to close ticket: $e');
+                    showTopToast(
+                      context,
+                      userFacingError(e,
+                          fallback:
+                              'Unable to close the ticket. Please try again.'),
+                    );
                   }
                 }
               },
@@ -1823,13 +1957,13 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
                                           'Thank you! Your feedback on this consultation has been submitted.');
                                     }
                                   } catch (e) {
-                                    setSheetState(() => isSubmitting = false);
                                     if (ctx.mounted) {
+                                      setSheetState(() => isSubmitting = false);
                                       showTopToast(
                                           ctx,
-                                          e
-                                              .toString()
-                                              .replaceAll('Exception: ', ''));
+                                          userFacingError(e,
+                                              fallback:
+                                                  'Unable to submit your feedback.'));
                                     }
                                   }
                                 },
@@ -1869,6 +2003,7 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
         );
       },
     );
+    _disposeAfterRouteClosed([titleController, bodyController]);
   }
 
   @override
@@ -2190,14 +2325,10 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
                             // Non-image file attachments
                             return GestureDetector(
                               onTap: () {
-                                Navigator.push(
+                                PoliciesWebViewScreen.open(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (context) => PoliciesWebViewScreen(
-                                      url: resolvedUrl,
-                                      title: name,
-                                    ),
-                                  ),
+                                  url: resolvedUrl,
+                                  title: name,
                                 );
                               },
                               child: Container(
@@ -2471,10 +2602,22 @@ class _TicketThreadScreenState extends State<TicketThreadScreen> {
                             showTopToast(context, 'Reply sent successfully!');
                           }
                         } catch (e) {
+                          if (mounted) {
+                            // Restore the draft so the message is not lost.
+                            if (_messageController.text.isEmpty) {
+                              _messageController.text = text;
+                            }
+                            setState(() {
+                              _pickedAttachments.insertAll(
+                                  0, attachmentsToSend);
+                            });
+                          }
                           if (context.mounted) {
                             showTopToast(
                               context,
-                              'Failed to send reply. Please try again.',
+                              userFacingError(e,
+                                  fallback:
+                                      'Failed to send reply. Please try again.'),
                             );
                           }
                         }
